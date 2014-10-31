@@ -1,6 +1,7 @@
 #![feature(if_let)]
 
 extern crate jis0208;
+extern crate unicode;
 
 pub mod catalog;
 pub mod subbook;

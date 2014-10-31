@@ -1,6 +1,7 @@
 use std;
 use std::io::{Reader, Seek, SeekSet, IoResult};
 use jis0208;
+use unicode;
 
 #[deriving(Show)]
 struct IndexLocation {
@@ -87,17 +88,17 @@ impl Indices {
 #[deriving(Show)]
 pub enum TextElement {
     UnicodeString(String),
-    StartNarrow,
-    EndNarrow,
     Newline
 }
 
-pub type Text = Vec<TextElement>;
+#[deriving(Show)]
+pub struct Text(Vec<TextElement>);
 
 fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
     let mut text = Vec::new();
 
     let started_at = try!(io.tell().map_err(IoError));
+    let mut is_narrow = false;
 
     loop {
         match length {
@@ -114,9 +115,9 @@ fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
                     // End text
                     0x03 => break,
                     // Start narrow text
-                    0x04 => text.push(StartNarrow),
+                    0x04 => is_narrow = true,
                     // End narrow text
-                    0x05 => text.push(EndNarrow),
+                    0x05 => is_narrow = false,
                     // Newline
                     0x0a => text.push(Newline),
 
@@ -127,7 +128,16 @@ fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
                 let other = try!(io.read_u8().map_err(IoError));
                 let codepoint = (byte as u16 << 8) | (other as u16);
 
-                if let Some(ch) = jis0208::decode_codepoint(codepoint) {
+                if let Some(mut ch) = jis0208::decode_codepoint(codepoint) {
+                    if is_narrow {
+                        if let Some(2) = unicode::char::width(ch, true) {
+                            /* FIXME
+                             * Using a decomposition might affect other characters than the ones we
+                             * want. Use a proper table.
+                             */
+                            unicode::char::decompose_compatible(ch, |new_ch| ch = new_ch);
+                        }
+                    }
                     if let Some(&UnicodeString(ref mut s)) = text.last_mut() {
                         s.push(ch);
                     } else {
@@ -140,5 +150,5 @@ fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
         }
     }
 
-    Ok(text)
+    Ok(Text(text))
 }
