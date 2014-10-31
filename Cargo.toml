@@ -1,0 +1,12 @@
+[package]
+
+name = "epwing"
+version = "0.0.1"
+authors = ["Mikko Perttunen <cyndis@kapsi.fi>"]
+
+[dependencies.jis0208]
+path = "src/jis0208"
+
+[[example]]
+name = "show_contents"
+path = "examples/show_contents/main.rs"
