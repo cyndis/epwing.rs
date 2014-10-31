@@ -88,6 +88,7 @@ impl Indices {
 #[deriving(Show)]
 pub enum TextElement {
     UnicodeString(String),
+    CustomCharacter(u16),
     Newline
 }
 
@@ -144,7 +145,7 @@ fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
                         text.push(UnicodeString(String::from_char(1, ch)));
                     }
                 } else {
-                    return Err(InvalidEncoding);
+                    text.push(CustomCharacter(codepoint));
                 }
             }
         }
