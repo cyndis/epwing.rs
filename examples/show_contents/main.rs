@@ -17,6 +17,9 @@ pub fn main() {
     let dir_name = std::str::from_utf8(catalog.subbooks[0].directory.as_slice()).unwrap();
     let subbook_path = path.dir_path().join_many([dir_name.trim_right(), "DATA", "HONMON"]);
 
-    let subbook = epwing::open_subbook(&subbook_path).unwrap();
+    let mut subbook = epwing::open_subbook(&subbook_path).unwrap();
     println!("{}", subbook);
+
+    let page = subbook.read_text(2, 0, None).unwrap();
+    println!("{}", page);
 }

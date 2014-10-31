@@ -1,5 +1,6 @@
 use std;
 use std::io::{Reader, Seek, SeekSet, IoResult};
+use jis0208;
 
 #[deriving(Show)]
 struct IndexLocation {
@@ -27,7 +28,8 @@ impl<IO> std::fmt::Show for Subbook<IO> {
 #[deriving(Show)]
 pub enum Error {
     IoError(std::io::IoError),
-    InvalidEncoding
+    InvalidEncoding,
+    InvalidControlCode(u8)
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -40,6 +42,11 @@ impl<IO: Reader+Seek> Subbook<IO> {
             io: io,
             indices: indices
         })
+    }
+
+    pub fn read_text(&mut self, page: u32, offset: u16, length: Option<u16>) -> Result<Text> {
+        try!(self.io.seek( ((page - 1) * 0x800 + offset as u32) as i64, SeekSet ).map_err(IoError));
+        read_text(&mut self.io, length)
     }
 }
 
@@ -75,4 +82,63 @@ impl Indices {
 
         Ok(ics)
     }
+}
+
+#[deriving(Show)]
+pub enum TextElement {
+    UnicodeString(String),
+    StartNarrow,
+    EndNarrow,
+    Newline
+}
+
+pub type Text = Vec<TextElement>;
+
+fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
+    let mut text = Vec::new();
+
+    let started_at = try!(io.tell().map_err(IoError));
+
+    loop {
+        match length {
+            Some(l) => if try!(io.tell().map_err(IoError)) - started_at >= l as u64 { break },
+            _ => ()
+        }
+
+        let byte = try!(io.read_u8().map_err(IoError));
+        match byte {
+            0x1f => {
+                match try!(io.read_u8().map_err(IoError)) {
+                    // Start text
+                    0x02 => (),
+                    // End text
+                    0x03 => break,
+                    // Start narrow text
+                    0x04 => text.push(StartNarrow),
+                    // End narrow text
+                    0x05 => text.push(EndNarrow),
+                    // Newline
+                    0x0a => text.push(Newline),
+
+                    cc => return Err(InvalidControlCode(cc))
+                }
+            },
+            _ => {
+                let other = try!(io.read_u8().map_err(IoError));
+                let codepoint = (byte as u16 << 8) | (other as u16);
+
+                if let Some(ch) = jis0208::decode_codepoint(codepoint) {
+                    if let Some(&UnicodeString(ref mut s)) = text.last_mut() {
+                        s.push(ch);
+                    } else {
+                        text.push(UnicodeString(String::from_char(1, ch)));
+                    }
+                } else {
+                    return Err(InvalidEncoding);
+                }
+            }
+        }
+    }
+
+    Ok(text)
 }
