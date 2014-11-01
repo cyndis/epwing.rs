@@ -12,7 +12,8 @@ pub struct Catalog {
 pub struct Subbook {
     pub title: String,
     pub directory: Vec<u8>,
-    pub index_page: u16
+    pub index_page: u16,
+    pub text_file: Vec<u8>
 }
 
 #[deriving(Show)]
@@ -63,7 +64,9 @@ impl Subbook {
         Ok(Subbook {
             title: title,
             directory: directory,
-            index_page: index_page
+            index_page: index_page,
+            /* FIXME support EPWINGv2 filename section */
+            text_file: b"HONMON".to_vec()
         })
     }
 }
