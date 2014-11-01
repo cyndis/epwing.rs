@@ -20,6 +20,8 @@ pub fn main() {
     let mut subbook = epwing::open_subbook(&subbook_path).unwrap();
     println!("{}", subbook);
 
-    let page = subbook.read_text(2, 0, None).unwrap();
+    let page = subbook.read_text(2, 0).unwrap();
     println!("{}", page);
+
+    println!("{}", page.to_plaintext());
 }

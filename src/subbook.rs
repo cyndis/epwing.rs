@@ -45,9 +45,9 @@ impl<IO: Reader+Seek> Subbook<IO> {
         })
     }
 
-    pub fn read_text(&mut self, page: u32, offset: u16, length: Option<u16>) -> Result<Text> {
+    pub fn read_text(&mut self, page: u32, offset: u16) -> Result<Text> {
         try!(self.io.seek( ((page - 1) * 0x800 + offset as u32) as i64, SeekSet ).map_err(IoError));
-        read_text(&mut self.io, length)
+        read_text(&mut self.io)
     }
 }
 
@@ -95,18 +95,14 @@ pub enum TextElement {
 #[deriving(Show)]
 pub struct Text(Vec<TextElement>);
 
-fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
+fn read_text<R: Reader+Seek>(io: &mut R) -> Result<Text> {
     let mut text = Vec::new();
 
     let started_at = try!(io.tell().map_err(IoError));
     let mut is_narrow = false;
+    let mut delimiter_keyword = None;
 
     loop {
-        match length {
-            Some(l) => if try!(io.tell().map_err(IoError)) - started_at >= l as u64 { break },
-            _ => ()
-        }
-
         let byte = try!(io.read_u8().map_err(IoError));
         match byte {
             0x1f => {
@@ -121,6 +117,18 @@ fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
                     0x05 => is_narrow = false,
                     // Newline
                     0x0a => text.push(Newline),
+                    // Begin keyword
+                    0x41 => {
+                        let keyword = try!(io.read_be_u16().map_err(IoError));
+                        if delimiter_keyword == Some(keyword) {
+                            // Next entry encountered, stop.
+                            break;
+                        } else if delimiter_keyword.is_none() {
+                            delimiter_keyword = Some(keyword);
+                        }
+                    },
+                    // End keyword
+                    0x61 => (),
 
                     cc => return Err(InvalidControlCode(cc))
                 }
@@ -152,4 +160,22 @@ fn read_text<R: Reader+Seek>(io: &mut R, length: Option<u16>) -> Result<Text> {
     }
 
     Ok(Text(text))
+}
+
+impl Text {
+    pub fn to_plaintext(&self) -> String {
+        let mut out = String::new();
+
+        let Text(ref elems) = *self;
+
+        for elem in elems.iter() {
+            match *elem {
+                UnicodeString(ref s) => out.push_str(s.as_slice()),
+                CustomCharacter(cp) => (),
+                Newline => out.push('\n')
+            }
+        }
+
+        out
+    }
 }
