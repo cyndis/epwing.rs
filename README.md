@@ -1,6 +1,6 @@
 # EPWING.rs - Dictionary parsing library
 
-EPWING.rs is a Rust library for reading electronic dictionaries stored in the EPWING format. Only a small subset of EPWING features are currently supported.
+EPWING.rs is a Rust library for reading electronic dictionaries stored in the EPWING format. Only a small subset of EPWING features is currently supported.
 
 ## Features
 
