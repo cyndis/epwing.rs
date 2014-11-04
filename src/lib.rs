@@ -7,13 +7,13 @@ pub mod catalog;
 pub mod subbook;
 
 pub fn read_catalog(path: &Path) -> catalog::Result<catalog::Catalog> {
-    let mut fp = try!(std::io::File::open(path).map_err(catalog::IoError));
+    let mut fp = try!(std::io::File::open(path));
 
     catalog::Catalog::read_from(&mut fp)
 }
 
 pub fn open_subbook(path: &Path) -> subbook::Result<subbook::Subbook<std::io::File>> {
-    let fp = try!(std::io::File::open(path).map_err(subbook::IoError));
+    let fp = try!(std::io::File::open(path));
 
     subbook::Subbook::from_io(fp)
 }

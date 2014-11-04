@@ -1,5 +1,6 @@
 use std;
-use std::io::{Reader, Seek, SeekSet, IoResult};
+use std::io::{Reader, Seek, SeekSet, IoResult, IoError};
+use std::error::FromError;
 use jis0208;
 use unicode;
 
@@ -28,16 +29,22 @@ impl<IO> std::fmt::Show for Subbook<IO> {
 
 #[deriving(Show)]
 pub enum Error {
-    IoError(std::io::IoError),
+    Io(IoError),
     InvalidEncoding,
     InvalidControlCode(u8)
+}
+
+impl FromError<IoError> for Error {
+    fn from_error(err: IoError) -> Error {
+        Io(err)
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl<IO: Reader+Seek> Subbook<IO> {
     pub fn from_io(mut io: IO) -> Result<Subbook<IO>> {
-        let indices = try!(Indices::read_from(&mut io).map_err(IoError));
+        let indices = try!(Indices::read_from(&mut io));
 
         Ok(Subbook {
             io: io,
@@ -46,7 +53,7 @@ impl<IO: Reader+Seek> Subbook<IO> {
     }
 
     pub fn read_text(&mut self, page: u32, offset: u16) -> Result<Text> {
-        try!(self.io.seek( ((page - 1) * 0x800 + offset as u32) as i64, SeekSet ).map_err(IoError));
+        try!(self.io.seek( ((page - 1) * 0x800 + offset as u32) as i64, SeekSet ));
         read_text(&mut self.io)
     }
 }
@@ -98,15 +105,15 @@ pub struct Text(Vec<TextElement>);
 fn read_text<R: Reader+Seek>(io: &mut R) -> Result<Text> {
     let mut text = Vec::new();
 
-    let started_at = try!(io.tell().map_err(IoError));
+    let started_at = try!(io.tell());
     let mut is_narrow = false;
     let mut delimiter_keyword = None;
 
     loop {
-        let byte = try!(io.read_u8().map_err(IoError));
+        let byte = try!(io.read_u8());
         match byte {
             0x1f => {
-                match try!(io.read_u8().map_err(IoError)) {
+                match try!(io.read_u8()) {
                     // Start text
                     0x02 => (),
                     // End text
@@ -119,7 +126,7 @@ fn read_text<R: Reader+Seek>(io: &mut R) -> Result<Text> {
                     0x0a => text.push(Newline),
                     // Begin keyword
                     0x41 => {
-                        let keyword = try!(io.read_be_u16().map_err(IoError));
+                        let keyword = try!(io.read_be_u16());
                         if delimiter_keyword == Some(keyword) {
                             // Next entry encountered, stop.
                             break;
@@ -134,7 +141,7 @@ fn read_text<R: Reader+Seek>(io: &mut R) -> Result<Text> {
                 }
             },
             _ => {
-                let other = try!(io.read_u8().map_err(IoError));
+                let other = try!(io.read_u8());
                 let codepoint = (byte as u16 << 8) | (other as u16);
 
                 if let Some(mut ch) = jis0208::decode_codepoint(codepoint) {
