@@ -40,7 +40,7 @@ impl<IO: Reader+Seek> Subbook<IO> {
     }
 
     pub fn read_text(&mut self, page: u32, offset: u16) -> Result<Text> {
-        try!(self.io.seek( ((page - 1) * 0x800 + offset as u32) as i64, SeekSet ));
+        try!(self.io.seek( (page * 0x800 + offset as u32) as i64, SeekSet ));
         read_text(&mut self.io)
     }
 }
