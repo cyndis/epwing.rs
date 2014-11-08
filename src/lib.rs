@@ -21,6 +21,23 @@ pub enum Error {
     InvalidFormat
 }
 
+impl std::error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Io(_) => "input/output error",
+            InvalidEncoding => "encountered non-JIS X 0208 character",
+            InvalidFormat => "file is malformed"
+        }
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        match *self {
+            Io(ref e) => Some(e as &std::error::Error),
+            _ => None
+        }
+    }
+}
+
 impl FromError<IoError> for Error {
     fn from_error(err: IoError) -> Error {
         Io(err)
