@@ -1,8 +1,10 @@
 use std;
-use std::io::{Reader, Seek, SeekSet, IoResult, IoError};
-use std::error::FromError;
+use std::io::{Reader, Seek, SeekSet, IoResult};
 use jis0208;
 use unicode;
+
+use Error;
+use Result;
 
 #[deriving(Show)]
 struct IndexLocation {
@@ -27,21 +29,6 @@ impl<IO> std::fmt::Show for Subbook<IO> {
     }
 }
 
-#[deriving(Show)]
-pub enum Error {
-    Io(IoError),
-    InvalidEncoding,
-    InvalidControlCode(u8)
-}
-
-impl FromError<IoError> for Error {
-    fn from_error(err: IoError) -> Error {
-        Io(err)
-    }
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
 impl<IO: Reader+Seek> Subbook<IO> {
     pub fn from_io(mut io: IO) -> Result<Subbook<IO>> {
         let indices = try!(Indices::read_from(&mut io));
@@ -64,7 +51,7 @@ impl Indices {
         let n_indices = try!(io.read_u8());
 
         try!(io.seek(4, SeekSet));
-        let global_avail = try!(io.read_u8());
+        let _global_avail = try!(io.read_u8());
 
         let mut ics = Indices {
             menu: None, copyright: None
@@ -77,7 +64,7 @@ impl Indices {
             try!(io.read_exact(1));
             let start_page = try!(io.read_be_u32());
             let page_count = try!(io.read_be_u32());
-            let avail = try!(io.read_u8());
+            let _avail = try!(io.read_u8());
 
             let loc = IndexLocation { page: start_page, length: page_count };
 
@@ -100,12 +87,11 @@ pub enum TextElement {
 }
 
 #[deriving(Show)]
-pub struct Text(Vec<TextElement>);
+pub type Text = Vec<TextElement>;
 
-fn read_text<R: Reader+Seek>(io: &mut R) -> Result<Text> {
+fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
     let mut text = Vec::new();
 
-    let started_at = try!(io.tell());
     let mut is_narrow = false;
     let mut delimiter_keyword = None;
 
@@ -137,7 +123,7 @@ fn read_text<R: Reader+Seek>(io: &mut R) -> Result<Text> {
                     // End keyword
                     0x61 => (),
 
-                    cc => return Err(InvalidControlCode(cc))
+                    _ => return Err(Error::InvalidFormat)
                 }
             },
             _ => {
@@ -166,19 +152,21 @@ fn read_text<R: Reader+Seek>(io: &mut R) -> Result<Text> {
         }
     }
 
-    Ok(Text(text))
+    Ok(text)
 }
 
-impl Text {
-    pub fn to_plaintext(&self) -> String {
+pub trait ToPlaintext {
+    fn to_plaintext(&self) -> String;
+}
+
+impl ToPlaintext for Text {
+    fn to_plaintext(&self) -> String {
         let mut out = String::new();
 
-        let Text(ref elems) = *self;
-
-        for elem in elems.iter() {
+        for elem in self.iter() {
             match *elem {
                 UnicodeString(ref s) => out.push_str(s.as_slice()),
-                CustomCharacter(cp) => (),
+                CustomCharacter(_) => (),
                 Newline => out.push('\n')
             }
         }

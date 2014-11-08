@@ -1,28 +1,27 @@
 extern crate epwing;
 
+use epwing::ToPlaintext;
+
 pub fn main() {
-    let catalog_path = match std::os::args().get(1) {
-        Some(path) => path.clone(),
+    let book_path = match std::os::args().get(1) {
+        Some(path) => Path::new(path),
         None => panic!("No path given")
     };
 
-    println!("{}", catalog_path);
+    let book = epwing::Book::open(book_path).unwrap();
 
-    let path = Path::new(catalog_path.as_slice());
-    let mut fp = std::io::File::open(&path).unwrap();
+    println!("Subbooks:");
+    for (i, subbook) in book.subbooks().iter().enumerate() {
+        println!("  {}: {}", i+1, subbook.title);
+    }
 
-    let catalog = epwing::catalog::Catalog::read_from(&mut fp).unwrap();
-    println!("{}", catalog);
+    println!("");
 
-    let dir_name = std::str::from_utf8(catalog.subbooks[0].directory.as_slice()).unwrap();
-    let file_name = std::str::from_utf8(catalog.subbooks[0].text_file.as_slice()).unwrap();
-    let subbook_path = path.dir_path().join_many([dir_name.trim_right(), "DATA", file_name]);
+    let spine = book.subbooks().head().unwrap();
+    println!("Title page for {}:", spine.title);
 
-    let mut subbook = epwing::open_subbook(&subbook_path).unwrap();
-    println!("{}", subbook);
-
-    let page = subbook.read_text(2, 0).unwrap();
-    println!("{}", page);
-
-    println!("{}", page.to_plaintext());
+    let mut subbook = book.open_subbook(spine).unwrap();
+    let title_text = subbook.read_text(spine.index_page as u32, 0).unwrap();
+    println!("{}", title_text.to_plaintext());
 }
+

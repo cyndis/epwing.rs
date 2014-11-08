@@ -1,12 +1,12 @@
-use std;
-use std::io::{Reader, IoError};
-use std::error::FromError;
+use std::io::Reader;
 use jis0208;
+use Error;
+use Result;
 
 #[deriving(Show)]
 pub struct Catalog {
     pub epwing_version: u16,
-    pub subbooks: Vec<Subbook>
+    pub subbooks: Vec<Subbook>,
 }
 
 #[deriving(Show)]
@@ -14,25 +14,11 @@ pub struct Subbook {
     pub title: String,
     pub directory: Vec<u8>,
     pub index_page: u16,
-    pub text_file: Vec<u8>
+    pub text_file: Vec<u8>,
 }
-
-#[deriving(Show)]
-pub enum Error {
-    Io(std::io::IoError),
-    InvalidEncoding
-}
-
-impl FromError<IoError> for Error {
-    fn from_error(err: IoError) -> Error {
-        Io(err)
-    }
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 impl Catalog {
-    pub fn read_from<R: Reader>(io: &mut R) -> Result<Catalog> {
+    pub fn from_stream<R: Reader>(io: &mut R) -> Result<Catalog> {
         let n_subbooks = try!(io.read_be_u16());
         let epwing_version = try!(io.read_be_u16());
 
@@ -40,7 +26,7 @@ impl Catalog {
 
         let mut subbooks = Vec::with_capacity(n_subbooks as uint);
         for _ in range(0, n_subbooks) {
-            subbooks.push(try!(Subbook::read_from(io)));
+            subbooks.push(try!(Subbook::from_stream(io)));
         }
 
         Ok(Catalog { epwing_version: epwing_version, subbooks: subbooks })
@@ -56,12 +42,12 @@ fn trim_zero_cp<'a>(slice: &'a [u8]) -> &'a [u8] {
 }
 
 impl Subbook {
-    fn read_from<R: Reader>(io: &mut R) -> Result<Subbook> {
+    fn from_stream<R: Reader>(io: &mut R) -> Result<Subbook> {
         try!(io.read_exact(2));
 
         let title_jp = try!(io.read_exact(80));
         let trimmed = trim_zero_cp(title_jp.as_slice());
-        let title = try!(jis0208::decode_string(trimmed).ok_or(InvalidEncoding));
+        let title = try!(jis0208::decode_string(trimmed).ok_or(Error::InvalidEncoding));
         let directory = try!(io.read_exact(8));
 
         try!(io.read_exact(4));
