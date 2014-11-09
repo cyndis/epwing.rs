@@ -7,6 +7,9 @@ authors = ["Mikko Perttunen <cyndis@kapsi.fi>"]
 [dependencies.jis0208]
 path = "src/jis0208"
 
+[dependencies.unicode_hfwidth]
+git = "git://github.com/cyndis/unicode_hfwidth"
+
 [[example]]
 name = "show_contents"
 path = "examples/show_contents/main.rs"

@@ -1,7 +1,7 @@
 use std;
 use std::io::{Reader, Seek, SeekSet, IoResult};
 use jis0208;
-use unicode;
+use unicode_hfwidth;
 
 use Error;
 use Result;
@@ -132,13 +132,12 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
 
                 if let Some(mut ch) = jis0208::decode_codepoint(codepoint) {
                     if is_narrow {
-                        if let Some(2) = unicode::char::width(ch, true) {
-                            /* FIXME
-                             * Using a decomposition might affect other characters than the ones we
-                             * want. Use a proper table.
-                             */
-                            unicode::char::decompose_compatible(ch, |new_ch| ch = new_ch);
-                        }
+                        ch = match ch as u32 {
+                            // U+3000 IDEOGRAPHIC SPACE
+                            0x3000 => ' ',
+                            // Characters in Full/Half-width block
+                            _      => unicode_hfwidth::to_standard_width(ch).unwrap_or(ch)
+                        };
                     }
                     if let Some(&UnicodeString(ref mut s)) = text.last_mut() {
                         s.push(ch);

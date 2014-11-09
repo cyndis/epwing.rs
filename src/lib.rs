@@ -1,7 +1,7 @@
 #![feature(if_let)]
 
 extern crate jis0208;
-extern crate unicode;
+extern crate unicode_hfwidth;
 
 use std::error::FromError;
 use std::io::IoError;
