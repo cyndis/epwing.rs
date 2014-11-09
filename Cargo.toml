@@ -5,7 +5,7 @@ version = "0.0.1"
 authors = ["Mikko Perttunen <cyndis@kapsi.fi>"]
 
 [dependencies.jis0208]
-path = "src/jis0208"
+git = "git://github.com/cyndis/jis0208"
 
 [dependencies.unicode_hfwidth]
 git = "git://github.com/cyndis/unicode_hfwidth"
