@@ -8,7 +8,7 @@ Note: features have only been tested on one EPWING book, and may not work with y
 
 - Partial reading of CATALOGS files
 - Reading text sections in HONMON files
-- Conversion of JIS X 0208 text into UTF-8. JIS X 0208 decoding is also available as a separate crate.
+- Automatic conversion of JIS X 0208 text into UTF-8 using the jis0208 crate
 
 ## Currently not supported
 
