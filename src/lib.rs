@@ -1,4 +1,4 @@
-#![feature(if_let)]
+#![feature(if_let, slicing_syntax)]
 
 extern crate jis0208;
 extern crate unicode_hfwidth;

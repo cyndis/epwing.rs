@@ -83,7 +83,8 @@ impl Indices {
 pub enum TextElement {
     UnicodeString(String),
     CustomCharacter(u16),
-    Newline
+    Newline,
+    Unsupported(&'static str)
 }
 
 pub type Text = Vec<TextElement>;
@@ -107,6 +108,7 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                     0x04 => is_narrow = true,
                     // End narrow text
                     0x05 => is_narrow = false,
+                    0x09 => { try!(io.read_be_u16()); text.push(TextElement::Unsupported("indent")) }
                     // Newline
                     0x0a => text.push(TextElement::Newline),
                     // Begin keyword
@@ -119,10 +121,12 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                             delimiter_keyword = Some(keyword);
                         }
                     },
+                    0x42 => text.push(TextElement::Unsupported("ref")),
                     // End keyword
                     0x61 => (),
+                    0x62 => { try!(io.read_be_u32()); try!(io.read_be_u16()); text.push(TextElement::Unsupported("/ref")); },
 
-                    _ => return Err(Error::InvalidFormat)
+                    x => { println!("0x{:x}", x); return Err(Error::InvalidFormat) }
                 }
             },
             _ => {
@@ -165,7 +169,8 @@ impl ToPlaintext for Text {
             match *elem {
                 TextElement::UnicodeString(ref s) => out.push_str(s.as_slice()),
                 TextElement::CustomCharacter(_) => (),
-                TextElement::Newline => out.push('\n')
+                TextElement::Newline => out.push('\n'),
+                TextElement::Unsupported(name) => out.push_str(format!("<{}>", name)[])
             }
         }
 
