@@ -47,7 +47,12 @@ impl Subbook {
 
         let title_jp = try!(io.read_exact(80));
         let trimmed = trim_zero_cp(title_jp.as_slice());
-        let title = try!(jis0208::decode_string(trimmed).ok_or(Error::InvalidEncoding));
+        let mut title = String::new();
+        for cs in trimmed.chunks(2) {
+            let (a, b) = (cs[0] as u16, cs[1] as u16);
+            let cp = try!(jis0208::decode_codepoint((a << 8) | b).ok_or(Error::InvalidEncoding));
+            title.push(cp);
+        }
         let directory = try!(io.read_exact(8));
 
         try!(io.read_exact(4));

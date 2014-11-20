@@ -24,15 +24,15 @@ pub enum Error {
 impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Io(_) => "input/output error",
-            InvalidEncoding => "encountered non-JIS X 0208 character",
-            InvalidFormat => "file is malformed"
+            Error::Io(_) => "input/output error",
+            Error::InvalidEncoding => "encountered non-JIS X 0208 character",
+            Error::InvalidFormat => "file is malformed"
         }
     }
 
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
-            Io(ref e) => Some(e as &std::error::Error),
+            Error::Io(ref e) => Some(e as &std::error::Error),
             _ => None
         }
     }
@@ -40,7 +40,7 @@ impl std::error::Error for Error {
 
 impl FromError<IoError> for Error {
     fn from_error(err: IoError) -> Error {
-        Io(err)
+        Error::Io(err)
     }
 }
 
@@ -68,10 +68,10 @@ impl Book {
 
     pub fn open_subbook(&self, subbook: &catalog::Subbook) -> Result<Subbook<std::io::File>> {
         let last_nonws_i = try!(subbook.directory.iter().rposition(|&ch| ch != ' ' as u8)
-                                                        .ok_or(InvalidFormat));
+                                                        .ok_or(Error::InvalidFormat));
         let dir_path = subbook.directory.slice_to(last_nonws_i+1);
 
-        let path = self.path.join_many([dir_path, b"DATA", subbook.text_file.as_slice()]);
+        let path = self.path.join_many(&[dir_path, b"DATA", subbook.text_file.as_slice()]);
         let fp = try!(std::io::File::open(&path));
 
         subbook::Subbook::from_io(fp)

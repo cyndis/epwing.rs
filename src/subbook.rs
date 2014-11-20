@@ -86,7 +86,6 @@ pub enum TextElement {
     Newline
 }
 
-#[deriving(Show)]
 pub type Text = Vec<TextElement>;
 
 fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
@@ -109,7 +108,7 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                     // End narrow text
                     0x05 => is_narrow = false,
                     // Newline
-                    0x0a => text.push(Newline),
+                    0x0a => text.push(TextElement::Newline),
                     // Begin keyword
                     0x41 => {
                         let keyword = try!(io.read_be_u16());
@@ -139,13 +138,13 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                             _      => unicode_hfwidth::to_standard_width(ch).unwrap_or(ch)
                         };
                     }
-                    if let Some(&UnicodeString(ref mut s)) = text.last_mut() {
+                    if let Some(&TextElement::UnicodeString(ref mut s)) = text.last_mut() {
                         s.push(ch);
                     } else {
-                        text.push(UnicodeString(String::from_char(1, ch)));
+                        text.push(TextElement::UnicodeString(String::from_char(1, ch)));
                     }
                 } else {
-                    text.push(CustomCharacter(codepoint));
+                    text.push(TextElement::CustomCharacter(codepoint));
                 }
             }
         }
@@ -164,9 +163,9 @@ impl ToPlaintext for Text {
 
         for elem in self.iter() {
             match *elem {
-                UnicodeString(ref s) => out.push_str(s.as_slice()),
-                CustomCharacter(_) => (),
-                Newline => out.push('\n')
+                TextElement::UnicodeString(ref s) => out.push_str(s.as_slice()),
+                TextElement::CustomCharacter(_) => (),
+                TextElement::Newline => out.push('\n')
             }
         }
 
