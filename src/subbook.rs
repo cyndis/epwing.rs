@@ -269,6 +269,10 @@ pub enum TextElement {
     UnicodeString(String),
     CustomCharacter(u16),
     Newline,
+    Indent(u16),
+    NoNewline(bool),
+    BeginDecoration(u16),
+    EndDecoration,
     Unsupported(&'static str)
 }
 
@@ -293,9 +297,22 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                     0x04 => is_narrow = true,
                     // End narrow text
                     0x05 => is_narrow = false,
-                    0x09 => { try!(io.read_be_u16()); text.push(TextElement::Unsupported("indent")) }
+                    // Begin subscript
+                    0x06 => text.push(TextElement::Unsupported("sub")),
+                    // End subscript
+                    0x07 => text.push(TextElement::Unsupported("/sub")),
+                    // Indent
+                    0x09 => text.push(TextElement::Indent(try!(io.read_be_u16()))),
                     // Newline
                     0x0a => text.push(TextElement::Newline),
+                    // Superscript
+                    0x0e => text.push(TextElement::Unsupported("sup")),
+                    // End superscript
+                    0x0f => text.push(TextElement::Unsupported("/sup")),
+                    // Newline prohibition
+                    0x10 => text.push(TextElement::NoNewline(true)),
+                    // End newline prohibition
+                    0x11 => text.push(TextElement::NoNewline(false)),
                     // Begin keyword
                     0x41 => {
                         let keyword = try!(io.read_be_u16());
@@ -306,10 +323,17 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                             delimiter_keyword = Some(keyword);
                         }
                     },
+                    // Begin reference
                     0x42 => text.push(TextElement::Unsupported("ref")),
                     // End keyword
                     0x61 => (),
-                    0x62 => { try!(io.read_be_u32()); try!(io.read_be_u16()); text.push(TextElement::Unsupported("/ref")); },
+                    // End reference
+                    0x62 => {
+                        try!(io.read_be_u32()); try!(io.read_be_u16());
+                        text.push(TextElement::Unsupported("/ref"));
+                    }
+                    0xe0 => text.push(TextElement::BeginDecoration(try!(io.read_be_u16()))),
+                    0xe1 => text.push(TextElement::EndDecoration),
 
                     x => { println!("0x{:x}", x); return Err(Error::InvalidFormat) }
                 }
@@ -351,6 +375,14 @@ impl ToPlaintext for Text {
                 TextElement::UnicodeString(ref s) => out.push_str(s.as_slice()),
                 TextElement::CustomCharacter(_) => (),
                 TextElement::Newline => out.push('\n'),
+                TextElement::Indent(num) => {
+                    for _ in range(0, num) {
+                        out.push(' ');
+                    }
+                },
+                TextElement::NoNewline(mode) => (),
+                TextElement::BeginDecoration(deco) => (),
+                TextElement::EndDecoration => (),
                 TextElement::Unsupported(name) => out.push_str(format!("<{}>", name)[])
             }
         }
