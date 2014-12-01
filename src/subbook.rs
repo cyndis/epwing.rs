@@ -55,8 +55,6 @@ impl<IO: Reader+Seek> Subbook<IO> {
     pub fn from_io(mut io: IO) -> Result<Subbook<IO>> {
         let indices = try!(Indices::read_from(&mut io));
 
-        println!("Indices: {}", indices);
-
         Ok(Subbook {
             io: io,
             indices: indices
