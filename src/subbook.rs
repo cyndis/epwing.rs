@@ -119,7 +119,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                         },
                         0xc0 => {
                             /* Group entry */
-                            let text_page = try!(io.read_be_u32());
+                            let text_page = try!(io.read_be_u32())-1;
                             let text_offs = try!(io.read_be_u16());
 
                             if matched {
@@ -132,7 +132,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                 (false, true) => {
                     let name_len = try!(io.read_u8()) as uint;
                     let name = try!(io.read_jis_string(name_len));
-                    let text_page = try!(io.read_be_u32());
+                    let text_page = try!(io.read_be_u32())-1;
                     let text_offs = try!(io.read_be_u16());
                     let _head_page = try!(io.read_be_u32());
                     let _head_offs = try!(io.read_be_u16());
