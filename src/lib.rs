@@ -1,4 +1,4 @@
-#![feature(if_let, slicing_syntax)]
+#![feature(if_let, slicing_syntax, macro_rules, globs)]
 
 extern crate jis0208;
 extern crate unicode_hfwidth;
@@ -14,11 +14,14 @@ pub use subbook::ToPlaintext as ToPlaintext;
 pub mod catalog;
 pub mod subbook;
 
+mod util;
+
 #[deriving(Show)]
 pub enum Error {
     Io(IoError),
     InvalidEncoding,
-    InvalidFormat
+    InvalidFormat,
+    IndexNotAvailable
 }
 
 impl std::error::Error for Error {
@@ -26,7 +29,8 @@ impl std::error::Error for Error {
         match *self {
             Error::Io(_) => "input/output error",
             Error::InvalidEncoding => "encountered non-JIS X 0208 character",
-            Error::InvalidFormat => "file is malformed"
+            Error::InvalidFormat => "file is malformed",
+            Error::IndexNotAvailable => "requested index is not available",
         }
     }
 

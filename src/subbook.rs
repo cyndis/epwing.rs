@@ -1,21 +1,60 @@
 use std;
 use std::io::{Reader, Seek, SeekSet, IoResult};
+
 use jis0208;
-use unicode_hfwidth;
+
+use util::{ReaderJisExt, CharWidthExt, ToJisString, ToUnicodeString};
 
 use Error;
 use Result;
 
+#[deriving(Show, Eq, PartialEq)]
+enum Canonicalization {
+    Convert,
+    AsIs,
+    Delete
+}
+impl Canonicalization {
+    pub fn from_field(field: u8) -> Option<Canonicalization> {
+        match field {
+            0x00 => Some(Canonicalization::Convert),
+            0x01 => Some(Canonicalization::AsIs),
+            0x02 => Some(Canonicalization::Delete),
+            _    => None
+        }
+    }
+}
+
 #[deriving(Show)]
-struct IndexLocation {
+struct IndexCanonicalization {
+    katakana: Canonicalization,
+    lower: Canonicalization,
+    mark: Canonicalization,
+    long_vowel: Canonicalization,
+    double_consonant: Canonicalization,
+    contracted_sound: Canonicalization,
+    small_vowel: Canonicalization,
+    voiced_consonant: Canonicalization,
+    p_sound: Canonicalization,
+    space: Canonicalization
+}
+
+#[deriving(Show)]
+struct IndexData {
     page: u32,
-    length: u32
+    length: u32,
+    canonicalization: IndexCanonicalization
 }
 
 #[deriving(Show)]
 struct Indices {
-    menu: Option<IndexLocation>,
-    copyright: Option<IndexLocation>,
+    menu: Option<IndexData>,
+    copyright: Option<IndexData>,
+    word_asis: Option<IndexData>,
+}
+
+pub enum Index {
+    WordAsIs
 }
 
 pub struct Subbook<IO> {
@@ -33,6 +72,8 @@ impl<IO: Reader+Seek> Subbook<IO> {
     pub fn from_io(mut io: IO) -> Result<Subbook<IO>> {
         let indices = try!(Indices::read_from(&mut io));
 
+        println!("Indices: {}", indices);
+
         Ok(Subbook {
             io: io,
             indices: indices
@@ -43,18 +84,155 @@ impl<IO: Reader+Seek> Subbook<IO> {
         try!(self.io.seek( (page * 0x800 + offset as u32) as i64, SeekSet ));
         read_text(&mut self.io)
     }
+
+    pub fn search(&mut self, index: Index, word: &str) -> Result<Vec<(u32, u16)>> {
+        let idata = try!(match index {
+            Index::WordAsIs => &self.indices.word_asis,
+        }.ok_or(Error::IndexNotAvailable));
+        let index_page = idata.page - 1;
+
+        println!("index page {} addr {}", index_page, index_page * 0x800);
+
+        try!(self.io.seek( (index_page * 0x800 ) as i64, SeekSet ));
+
+        let canonical = canonicalize(word, &idata.canonicalization).to_jis_string();
+
+        search_descend(&mut self.io, canonical.as_slice())
+    }
+}
+
+fn canonicalize(s: &str, rules: &IndexCanonicalization) -> String {
+    use self::Canonicalization::*;
+
+    FromIterator::from_iter(s.chars().filter_map(|mut ch| {
+        ch = ch.to_fullwidth();
+
+        if rules.space == Delete && ch == '\u3000' /* IDEOGRAPHIC SPACE */ {
+            return None;
+        }
+
+        if rules.lower == Convert && ch.is_lowercase() {
+            ch = ch.to_uppercase();
+        }
+
+        return Some(ch);
+    }))
+}
+
+#[test]
+fn test_canonicalize() {
+    let c = IndexCanonicalization {
+        katakana: Canonicalization::Convert,
+        lower: Canonicalization::Convert,
+        mark: Canonicalization::Delete,
+        long_vowel: Canonicalization::Convert,
+        double_consonant: Canonicalization::Convert,
+        contracted_sound: Canonicalization::Convert,
+        small_vowel: Canonicalization::Convert,
+        voiced_consonant: Canonicalization::Convert,
+        p_sound: Canonicalization::Convert,
+        space: Canonicalization::Delete
+    };
+
+    assert_eq!(canonicalize("environmental stress", &c)[], "ＥＮＶＩＲＯＮＭＥＮＴＡＬＳＴＲＥＳＳ");
+}
+
+fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
+    -> Result<Vec<(u32, u16)>>
+{
+    let page_id = try!(io.read_u8());
+    let entry_len = try!(io.read_u8()) as uint;
+    let entry_count = try!(io.read_be_u16());
+
+    let is_leaf = page_id & 0x80 > 0;
+    let has_groups = page_id & 0x10 > 0;
+    let has_variable_arrangement = entry_len == 0;
+
+    if is_leaf {
+        /* Leaf page with links to content */
+
+        let mut results = vec![];
+        let mut matched = false;
+
+        for _entry_i in range(0, entry_count) {
+            match (has_groups, has_variable_arrangement) {
+                (true, _) => {
+                    let group_id = try!(io.read_u8());
+
+                    match group_id {
+                        0x80 => {
+                            /* Start of group */
+                            let name_len = try!(io.read_u8()) as uint;
+                            try!(io.read_be_u32());
+                            let name = try!(io.read_jis_string(name_len));
+
+                            if word == name[] {
+                                matched = true;
+                            } else {
+                                matched = false;
+                            }
+                        },
+                        0x00 => {
+                            /* Single-entry group */
+                            unimplemented!()
+                        },
+                        0xc0 => {
+                            /* Group entry */
+                            let text_page = try!(io.read_be_u32());
+                            let text_offs = try!(io.read_be_u16());
+
+                            if matched {
+                                results.push((text_page, text_offs));
+                            }
+                        },
+                        _ => panic!("unexpected group_id {}", group_id)
+                    }
+                },
+                (false, true) => {
+                    let name_len = try!(io.read_u8()) as uint;
+                    let name = try!(io.read_jis_string(name_len));
+                    let text_page = try!(io.read_be_u32());
+                    let text_offs = try!(io.read_be_u16());
+                    let _head_page = try!(io.read_be_u32());
+                    let _head_offs = try!(io.read_be_u16());
+
+                    if word == name[] {
+                        results.push((text_page, text_offs));
+                    }
+                },
+                (false, false) => unimplemented!()
+            }
+        }
+
+        return Ok(results);
+    } else {
+        /* Internal node in index tree */
+
+        for entry_i in range(0, entry_count) {
+            let name = try!(io.read_jis_string(entry_len));
+            let page = try!(io.read_be_u32()) - 1;
+
+            if word <= name[] {
+                try!(io.seek( (page * 0x800 ) as i64, SeekSet ));
+                return search_descend(io, word);
+            }
+        }
+
+        return Ok(vec![]);
+    }
 }
 
 impl Indices {
-    fn read_from<R: Reader+Seek>(io: &mut R) -> IoResult<Indices> {
+    fn read_from<R: Reader+Seek>(io: &mut R) -> Result<Indices> {
         try!(io.seek(1, SeekSet));
         let n_indices = try!(io.read_u8());
 
         try!(io.seek(4, SeekSet));
-        let _global_avail = try!(io.read_u8());
+        let mut global_avail = try!(io.read_u8());
+        if global_avail > 0x02 { global_avail = 0x00; }
 
         let mut ics = Indices {
-            menu: None, copyright: None
+            menu: None, copyright: None, word_asis: None
         };
 
         for i in range(0, n_indices) {
@@ -64,13 +242,79 @@ impl Indices {
             try!(io.read_exact(1));
             let start_page = try!(io.read_be_u32());
             let page_count = try!(io.read_be_u32());
-            let _avail = try!(io.read_u8());
+            let avail = try!(io.read_u8());
+            let mut flags = 0u32;
+            flags |= try!(io.read_u8()) as u32 << 16;
+            flags |= try!(io.read_u8()) as u32 << 8;
+            flags |= try!(io.read_u8()) as u32 << 0;
 
-            let loc = IndexLocation { page: start_page, length: page_count };
+            let space_canonicalization = if index_id == 0x72 || index_id == 0x92 {
+                Canonicalization::AsIs
+            } else {
+                Canonicalization::Delete
+            };
+
+            macro_rules! canon(($mask:expr, $shift:expr) => (
+                try!(Canonicalization::from_field(((flags & $mask) >> $shift) as u8)
+                                      .ok_or(Error::InvalidFormat))
+            ))
+
+            let canonicalization =
+                if (global_avail == 0x00 || avail == 0x02) || global_avail == 0x02 {
+                    IndexCanonicalization {
+                        katakana: canon!(0xc00000, 22),
+                        lower: canon!(0x300000, 20),
+                        mark: if ((flags & 0x0c0000) >> 18) == 0 {
+                            Canonicalization::Delete
+                        } else {
+                            Canonicalization::AsIs
+                        },
+                        long_vowel: canon!(0x030000, 16),
+                        double_consonant: canon!(0x00c000, 14),
+                        contracted_sound: canon!(0x003000, 12),
+                        small_vowel: canon!(0x000c00, 10),
+                        voiced_consonant: canon!(0x000300, 8),
+                        p_sound: canon!(0x0000c0, 6),
+                        space: space_canonicalization
+                    }
+                } else if index_id == 0x70 || index_id == 0x90 {
+                    IndexCanonicalization {
+                        katakana: Canonicalization::Convert,
+                        lower: Canonicalization::Convert,
+                        mark: Canonicalization::Delete,
+                        long_vowel: Canonicalization::Convert,
+                        double_consonant: Canonicalization::Convert,
+                        contracted_sound: Canonicalization::Convert,
+                        small_vowel: Canonicalization::Convert,
+                        voiced_consonant: Canonicalization::Convert,
+                        p_sound: Canonicalization::Convert,
+                        space: space_canonicalization
+                    }
+                } else {
+                    IndexCanonicalization {
+                        katakana: Canonicalization::AsIs,
+                        lower: Canonicalization::Convert,
+                        mark: Canonicalization::AsIs,
+                        long_vowel: Canonicalization::AsIs,
+                        double_consonant: Canonicalization::AsIs,
+                        contracted_sound: Canonicalization::AsIs,
+                        small_vowel: Canonicalization::AsIs,
+                        voiced_consonant: Canonicalization::AsIs,
+                        p_sound: Canonicalization::AsIs,
+                        space: space_canonicalization
+                    }
+                };
+
+            let loc = IndexData {
+                page: start_page,
+                length: page_count,
+                canonicalization: canonicalization
+            };
 
             match index_id {
                 0x01 => ics.menu = Some(loc),
                 0x02 => ics.copyright = Some(loc),
+                0x91 => ics.word_asis = Some(loc),
                 _ => ()
             }
         }
@@ -79,7 +323,7 @@ impl Indices {
     }
 }
 
-#[deriving(Show)]
+#[deriving(Show, PartialEq, Eq)]
 pub enum TextElement {
     UnicodeString(String),
     CustomCharacter(u16),
@@ -135,13 +379,9 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
 
                 if let Some(mut ch) = jis0208::decode_codepoint(codepoint) {
                     if is_narrow {
-                        ch = match ch as u32 {
-                            // U+3000 IDEOGRAPHIC SPACE
-                            0x3000 => ' ',
-                            // Characters in Full/Half-width block
-                            _      => unicode_hfwidth::to_standard_width(ch).unwrap_or(ch)
-                        };
+                        ch = ch.to_standard_width();
                     }
+
                     if let Some(&TextElement::UnicodeString(ref mut s)) = text.last_mut() {
                         s.push(ch);
                     } else {

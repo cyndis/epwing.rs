@@ -47,3 +47,15 @@ fn plaintext_test() {
 <ref>→ General dictionary license statement</ref>
 <ref>→ JMDict information</ref>\n");
 }
+
+#[test]
+fn keyword_search_test() {
+    let book = open_book();
+    let spine = &book.subbooks()[0];
+    let mut sbook = book.open_subbook(spine).unwrap();
+
+    let result = sbook.search(epwing::subbook::Index::WordAsIs, "environmental stress").unwrap();
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0], (24562, 1264));
+}
