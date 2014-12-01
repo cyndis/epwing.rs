@@ -68,6 +68,18 @@ impl<IO> std::fmt::Show for Subbook<IO> {
     }
 }
 
+#[deriving(Show, Eq, PartialEq)]
+pub struct Location {
+    pub page: u32,
+    pub offset: u16
+}
+
+impl Location {
+    pub fn page(page: u32) -> Location {
+        Location { page: page, offset: 0 }
+    }
+}
+
 impl<IO: Reader+Seek> Subbook<IO> {
     pub fn from_io(mut io: IO) -> Result<Subbook<IO>> {
         let indices = try!(Indices::read_from(&mut io));
@@ -80,23 +92,19 @@ impl<IO: Reader+Seek> Subbook<IO> {
         })
     }
 
-    pub fn read_text(&mut self, page: u32, offset: u16) -> Result<Text> {
-        try!(self.io.seek( (page * 0x800 + offset as u32) as i64, SeekSet ));
+    pub fn read_text(&mut self, location: Location) -> Result<Text> {
+        try!(self.io.seek( (location.page * 0x800 + location.offset as u32) as i64, SeekSet ));
         read_text(&mut self.io)
     }
 
-    pub fn search(&mut self, index: Index, word: &str) -> Result<Vec<(u32, u16)>> {
+    pub fn search(&mut self, index: Index, word: &str) -> Result<Vec<Location>> {
         let idata = try!(match index {
             Index::WordAsIs => &self.indices.word_asis,
         }.ok_or(Error::IndexNotAvailable));
         let index_page = idata.page - 1;
-
-        println!("index page {} addr {}", index_page, index_page * 0x800);
-
-        try!(self.io.seek( (index_page * 0x800 ) as i64, SeekSet ));
-
         let canonical = canonicalize(word, &idata.canonicalization).to_jis_string();
 
+        try!(self.io.seek( (index_page * 0x800 ) as i64, SeekSet ));
         search_descend(&mut self.io, canonical.as_slice())
     }
 }
@@ -138,7 +146,7 @@ fn test_canonicalize() {
 }
 
 fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
-    -> Result<Vec<(u32, u16)>>
+    -> Result<Vec<Location>>
 {
     let page_id = try!(io.read_u8());
     let entry_len = try!(io.read_u8()) as uint;
@@ -182,7 +190,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                             let text_offs = try!(io.read_be_u16());
 
                             if matched {
-                                results.push((text_page, text_offs));
+                                results.push(Location { page: text_page, offset: text_offs });
                             }
                         },
                         _ => panic!("unexpected group_id {}", group_id)
@@ -197,7 +205,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                     let _head_offs = try!(io.read_be_u16());
 
                     if word == name[] {
-                        results.push((text_page, text_offs));
+                        results.push(Location { page: text_page, offset: text_offs });
                     }
                 },
                 (false, false) => unimplemented!()

@@ -24,7 +24,7 @@ fn title_test() {
     let spine = &book.subbooks()[0];
     let mut sbook = book.open_subbook(spine).unwrap();
 
-    let text = sbook.read_text(spine.index_page as u32, 0).unwrap();
+    let text = sbook.read_text(epwing::subbook::Location::page(spine.index_page as u32)).unwrap();
 
     assert_eq!(text[],
               [Unsupported("indent"), Unsupported("ref"), UnicodeString("→ About this conversion".into_string()),
@@ -41,7 +41,7 @@ fn plaintext_test() {
     let spine = &book.subbooks()[0];
     let mut sbook = book.open_subbook(spine).unwrap();
 
-    let text = sbook.read_text(spine.index_page as u32, 0).unwrap();
+    let text = sbook.read_text(epwing::subbook::Location::page(spine.index_page as u32)).unwrap();
 
     assert_eq!(text.to_plaintext()[], "<indent><ref>→ About this conversion</ref>
 <ref>→ General dictionary license statement</ref>
@@ -57,5 +57,5 @@ fn keyword_search_test() {
     let result = sbook.search(epwing::subbook::Index::WordAsIs, "environmental stress").unwrap();
 
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0], (24562, 1264));
+    assert_eq!(result[0], epwing::subbook::Location { page: 24562, offset: 1264 });
 }

@@ -1,6 +1,7 @@
 extern crate epwing;
 
 use epwing::ToPlaintext;
+use epwing::subbook::Location;
 
 pub fn main() {
     let book_path = match std::os::args().get(1) {
@@ -21,6 +22,6 @@ pub fn main() {
     println!("Title page ({}) for {}:", spine.index_page, spine.title);
 
     let mut subbook = book.open_subbook(spine).unwrap();
-    let title_text = subbook.read_text(spine.index_page as u32, 0).unwrap();
+    let title_text = subbook.read_text(Location::page(spine.index_page as u32)).unwrap();
     println!("{}", title_text.to_plaintext());
 }
