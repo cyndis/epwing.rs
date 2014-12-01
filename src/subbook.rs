@@ -23,6 +23,7 @@ struct Indices {
     word_asis: Option<IndexData>,
 }
 
+#[deriving(Show)]
 pub enum Index {
     WordAsIs
 }
