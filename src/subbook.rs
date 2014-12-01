@@ -4,46 +4,16 @@ use std::io::{Reader, Seek, SeekSet};
 use jis0208;
 
 use util::{ReaderJisExt, CharWidthExt, ToJisString};
+use canon::{CanonicalizationRules, Canonicalization, CanonicalizeExt};
 
 use Error;
 use Result;
-
-#[deriving(Show, Eq, PartialEq)]
-enum Canonicalization {
-    Convert,
-    AsIs,
-    Delete
-}
-impl Canonicalization {
-    pub fn from_field(field: u8) -> Option<Canonicalization> {
-        match field {
-            0x00 => Some(Canonicalization::Convert),
-            0x01 => Some(Canonicalization::AsIs),
-            0x02 => Some(Canonicalization::Delete),
-            _    => None
-        }
-    }
-}
-
-#[deriving(Show)]
-struct IndexCanonicalization {
-    katakana: Canonicalization,
-    lower: Canonicalization,
-    mark: Canonicalization,
-    long_vowel: Canonicalization,
-    double_consonant: Canonicalization,
-    contracted_sound: Canonicalization,
-    small_vowel: Canonicalization,
-    voiced_consonant: Canonicalization,
-    p_sound: Canonicalization,
-    space: Canonicalization
-}
 
 #[deriving(Show)]
 struct IndexData {
     page: u32,
     length: u32,
-    canonicalization: IndexCanonicalization
+    canonicalization: CanonicalizationRules
 }
 
 #[deriving(Show)]
@@ -102,47 +72,11 @@ impl<IO: Reader+Seek> Subbook<IO> {
             Index::WordAsIs => &self.indices.word_asis,
         }.ok_or(Error::IndexNotAvailable));
         let index_page = idata.page - 1;
-        let canonical = canonicalize(word, &idata.canonicalization).to_jis_string();
+        let canonical = word.canonicalize(&idata.canonicalization).to_jis_string();
 
         try!(self.io.seek( (index_page * 0x800 ) as i64, SeekSet ));
         search_descend(&mut self.io, canonical.as_slice())
     }
-}
-
-fn canonicalize(s: &str, rules: &IndexCanonicalization) -> String {
-    use self::Canonicalization::*;
-
-    FromIterator::from_iter(s.chars().filter_map(|mut ch| {
-        ch = ch.to_fullwidth();
-
-        if rules.space == Delete && ch == '\u3000' /* IDEOGRAPHIC SPACE */ {
-            return None;
-        }
-
-        if rules.lower == Convert && ch.is_lowercase() {
-            ch = ch.to_uppercase();
-        }
-
-        return Some(ch);
-    }))
-}
-
-#[test]
-fn test_canonicalize() {
-    let c = IndexCanonicalization {
-        katakana: Canonicalization::Convert,
-        lower: Canonicalization::Convert,
-        mark: Canonicalization::Delete,
-        long_vowel: Canonicalization::Convert,
-        double_consonant: Canonicalization::Convert,
-        contracted_sound: Canonicalization::Convert,
-        small_vowel: Canonicalization::Convert,
-        voiced_consonant: Canonicalization::Convert,
-        p_sound: Canonicalization::Convert,
-        space: Canonicalization::Delete
-    };
-
-    assert_eq!(canonicalize("environmental stress", &c)[], "ＥＮＶＩＲＯＮＭＥＮＴＡＬＳＴＲＥＳＳ");
 }
 
 fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
@@ -269,7 +203,7 @@ impl Indices {
 
             let canonicalization =
                 if (global_avail == 0x00 || avail == 0x02) || global_avail == 0x02 {
-                    IndexCanonicalization {
+                    CanonicalizationRules {
                         katakana: canon!(0xc00000, 22),
                         lower: canon!(0x300000, 20),
                         mark: if ((flags & 0x0c0000) >> 18) == 0 {
@@ -286,7 +220,7 @@ impl Indices {
                         space: space_canonicalization
                     }
                 } else if index_id == 0x70 || index_id == 0x90 {
-                    IndexCanonicalization {
+                    CanonicalizationRules {
                         katakana: Canonicalization::Convert,
                         lower: Canonicalization::Convert,
                         mark: Canonicalization::Delete,
@@ -299,7 +233,7 @@ impl Indices {
                         space: space_canonicalization
                     }
                 } else {
-                    IndexCanonicalization {
+                    CanonicalizationRules {
                         katakana: Canonicalization::AsIs,
                         lower: Canonicalization::Convert,
                         mark: Canonicalization::AsIs,

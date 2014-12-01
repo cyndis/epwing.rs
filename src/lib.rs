@@ -15,6 +15,7 @@ pub mod catalog;
 pub mod subbook;
 
 mod util;
+mod canon;
 
 #[deriving(Show)]
 pub enum Error {
