@@ -1,9 +1,9 @@
 use std;
-use std::io::{Reader, Seek, SeekSet, IoResult};
+use std::io::{Reader, Seek, SeekSet};
 
 use jis0208;
 
-use util::{ReaderJisExt, CharWidthExt, ToJisString, ToUnicodeString};
+use util::{ReaderJisExt, CharWidthExt, ToJisString};
 
 use Error;
 use Result;
@@ -154,7 +154,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
         let mut results = vec![];
         let mut matched = false;
 
-        for _entry_i in range(0, entry_count) {
+        for _ in range(0, entry_count) {
             match (has_groups, has_variable_arrangement) {
                 (true, _) => {
                     let group_id = try!(io.read_u8());
@@ -208,7 +208,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
     } else {
         /* Internal node in index tree */
 
-        for entry_i in range(0, entry_count) {
+        for _ in range(0, entry_count) {
             let name = try!(io.read_jis_string(entry_len));
             let page = try!(io.read_be_u32()) - 1;
 

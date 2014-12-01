@@ -105,7 +105,7 @@ impl ToUnicodeString for [u8] {
     fn to_unicode_string(&self) -> String {
         let mut data = String::new();
         for bs in self.chunks(2) {
-            let cp = ((bs[0] as u16 << 8) | (bs[1] as u16));
+            let cp = (bs[0] as u16 << 8) | (bs[1] as u16);
             for ch in jis0208::decode_codepoint(cp).into_iter() {
                 data.push(ch);
             }
