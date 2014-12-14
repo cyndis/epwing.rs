@@ -39,7 +39,7 @@ impl<IO> std::fmt::Show for Subbook<IO> {
     }
 }
 
-#[deriving(Show, Eq, PartialEq)]
+#[deriving(Show, Eq, PartialEq, Copy)]
 pub struct Location {
     pub page: u32,
     pub offset: u16
