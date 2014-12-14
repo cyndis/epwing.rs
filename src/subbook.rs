@@ -9,21 +9,21 @@ use canon::{CanonicalizationRules, Canonicalization, CanonicalizeExt};
 use Error;
 use Result;
 
-#[deriving(Show)]
+#[deriving(Show, Copy)]
 struct IndexData {
     page: u32,
     length: u32,
     canonicalization: CanonicalizationRules
 }
 
-#[deriving(Show)]
+#[deriving(Show, Copy)]
 struct Indices {
     menu: Option<IndexData>,
     copyright: Option<IndexData>,
     word_asis: Option<IndexData>,
 }
 
-#[deriving(Show)]
+#[deriving(Show, PartialEq, Eq, Copy)]
 pub enum Index {
     WordAsIs
 }

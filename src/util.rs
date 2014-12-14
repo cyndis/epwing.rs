@@ -66,7 +66,7 @@ impl CharWidthExt for char {
     fn to_standard_width(self) -> char {
         match self {
             // U+3000 IDEOGRAPHIC SPACE
-            '\u3000' => ' ',
+            '\u{3000}' => ' ',
             // Rest
             _        => unicode_hfwidth::to_standard_width(self).unwrap_or(self)
         }
@@ -74,7 +74,7 @@ impl CharWidthExt for char {
 
     fn to_fullwidth(self) -> char {
         match self {
-            ' ' => '\u3000',
+            ' ' => '\u{3000}',
             _   => unicode_hfwidth::to_fullwidth(self).unwrap_or(self)
         }
     }

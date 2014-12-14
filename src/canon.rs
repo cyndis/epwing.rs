@@ -1,6 +1,6 @@
 use util::CharWidthExt;
 
-#[deriving(Show, Eq, PartialEq)]
+#[deriving(Show, Eq, PartialEq, Copy)]
 pub enum Canonicalization {
     Convert,
     AsIs,
@@ -17,7 +17,7 @@ impl Canonicalization {
     }
 }
 
-#[deriving(Show)]
+#[deriving(Show, Eq, PartialEq, Copy)]
 pub struct CanonicalizationRules {
     pub katakana: Canonicalization,
     pub lower: Canonicalization,
@@ -42,7 +42,7 @@ impl CanonicalizeExt for str {
         FromIterator::from_iter(self.chars().filter_map(|mut ch| {
             ch = ch.to_fullwidth();
 
-            if rules.space == Delete && ch == '\u3000' /* IDEOGRAPHIC SPACE */ {
+            if rules.space == Delete && ch == '\u{3000}' /* IDEOGRAPHIC SPACE */ {
                 return None;
             }
 

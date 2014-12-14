@@ -1,4 +1,4 @@
-#![feature(if_let, slicing_syntax, macro_rules, globs)]
+#![feature(slicing_syntax, macro_rules, globs)]
 
 extern crate jis0208;
 extern crate unicode_hfwidth;

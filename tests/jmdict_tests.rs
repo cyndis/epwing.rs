@@ -18,7 +18,7 @@ fn catalog_test() {
 
 #[test]
 fn title_test() {
-    use epwing::subbook::TextElement::{Unsupported, UnicodeString, Newline};
+    use epwing::subbook::TextElement::{Unsupported, UnicodeString, Newline, Indent};
 
     let book = open_book();
     let spine = &book.subbooks()[0];
@@ -27,7 +27,7 @@ fn title_test() {
     let text = sbook.read_text(epwing::subbook::Location::page(spine.index_page as u32)).unwrap();
 
     assert_eq!(text[],
-              [Unsupported("indent"), Unsupported("ref"), UnicodeString("→ About this conversion".into_string()),
+              [Indent(1), Unsupported("ref"), UnicodeString("→ About this conversion".into_string()),
               Unsupported("/ref"), Newline, Unsupported("ref"),
               UnicodeString("→ General dictionary license statement".into_string()),
               Unsupported("/ref"), Newline, Unsupported("ref"), UnicodeString("→ JMDict information".into_string()),
@@ -43,7 +43,7 @@ fn plaintext_test() {
 
     let text = sbook.read_text(epwing::subbook::Location::page(spine.index_page as u32)).unwrap();
 
-    assert_eq!(text.to_plaintext()[], "<indent><ref>→ About this conversion</ref>
+    assert_eq!(text.to_plaintext()[], " <ref>→ About this conversion</ref>
 <ref>→ General dictionary license statement</ref>
 <ref>→ JMDict information</ref>\n");
 }
@@ -57,5 +57,5 @@ fn keyword_search_test() {
     let result = sbook.search(epwing::subbook::Index::WordAsIs, "environmental stress").unwrap();
 
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0], epwing::subbook::Location { page: 24562, offset: 1264 });
+    assert_eq!(result[0], epwing::subbook::Location { page: 24561, offset: 1264 });
 }
