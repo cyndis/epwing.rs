@@ -198,7 +198,7 @@ impl Indices {
             macro_rules! canon(($mask:expr, $shift:expr) => (
                 try!(Canonicalization::from_field(((flags & $mask) >> $shift) as u8)
                                       .ok_or(Error::InvalidFormat))
-            ))
+            ));
 
             let canonicalization =
                 if (global_avail == 0x00 || avail == 0x02) || global_avail == 0x02 {
@@ -380,8 +380,8 @@ impl ToPlaintext for Text {
                         out.push(' ');
                     }
                 },
-                TextElement::NoNewline(mode) => (),
-                TextElement::BeginDecoration(deco) => (),
+                TextElement::NoNewline(_mode) => (),
+                TextElement::BeginDecoration(_deco) => (),
                 TextElement::EndDecoration => (),
                 TextElement::Unsupported(name) => out.push_str(format!("<{}>", name)[])
             }
