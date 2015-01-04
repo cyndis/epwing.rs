@@ -1,6 +1,7 @@
 use util::CharWidthExt;
+use std::iter::FromIterator;
 
-#[deriving(Show, Eq, PartialEq, Copy)]
+#[derive(Show, Eq, PartialEq, Copy)]
 pub enum Canonicalization {
     Convert,
     AsIs,
@@ -17,7 +18,7 @@ impl Canonicalization {
     }
 }
 
-#[deriving(Show, Eq, PartialEq, Copy)]
+#[derive(Show, Eq, PartialEq, Copy)]
 pub struct CanonicalizationRules {
     pub katakana: Canonicalization,
     pub lower: Canonicalization,

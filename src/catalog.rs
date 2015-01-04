@@ -3,13 +3,13 @@ use jis0208;
 use Error;
 use Result;
 
-#[deriving(Show)]
+#[derive(Show)]
 pub struct Catalog {
     pub epwing_version: u16,
     pub subbooks: Vec<Subbook>,
 }
 
-#[deriving(Show)]
+#[derive(Show)]
 pub struct Subbook {
     pub title: String,
     pub directory: Vec<u8>,

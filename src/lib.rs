@@ -17,7 +17,7 @@ pub mod subbook;
 mod util;
 mod canon;
 
-#[deriving(Show)]
+#[derive(Show)]
 pub enum Error {
     Io(IoError),
     InvalidEncoding,

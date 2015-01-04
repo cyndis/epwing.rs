@@ -18,7 +18,7 @@ pub fn main() {
 
     println!("");
 
-    let spine = book.subbooks().head().unwrap();
+    let spine = book.subbooks().first().unwrap();
     println!("Title page ({}) for {}:", spine.index_page, spine.title);
 
     let mut subbook = book.open_subbook(spine).unwrap();

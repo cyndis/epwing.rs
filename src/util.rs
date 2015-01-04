@@ -86,7 +86,7 @@ pub trait ToJisString for Sized? {
 
 impl ToJisString for str {
     fn to_jis_string(&self) -> Vec<u8> {
-        let mut data = Vec::with_capacity(self.char_len() * 2);
+        let mut data = Vec::with_capacity(self.chars().count() * 2);
         for ch in self.chars() {
             for cp in jis0208::encode_codepoint(ch).into_iter() {
                 data.push(((cp & 0xff00) >> 8) as u8);
@@ -105,7 +105,7 @@ impl ToUnicodeString for [u8] {
     fn to_unicode_string(&self) -> String {
         let mut data = String::new();
         for bs in self.chunks(2) {
-            let cp = (bs[0] as u16 << 8) | (bs[1] as u16);
+            let cp = ((bs[0] as u16) << 8) | (bs[1] as u16);
             for ch in jis0208::decode_codepoint(cp).into_iter() {
                 data.push(ch);
             }

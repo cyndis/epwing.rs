@@ -9,21 +9,21 @@ use canon::{CanonicalizationRules, Canonicalization, CanonicalizeExt};
 use Error;
 use Result;
 
-#[deriving(Show, Copy)]
+#[derive(Show, Copy)]
 struct IndexData {
     page: u32,
     length: u32,
     canonicalization: CanonicalizationRules
 }
 
-#[deriving(Show, Copy)]
+#[derive(Show, Copy)]
 struct Indices {
     menu: Option<IndexData>,
     copyright: Option<IndexData>,
     word_asis: Option<IndexData>,
 }
 
-#[deriving(Show, PartialEq, Eq, Copy)]
+#[derive(Show, PartialEq, Eq, Copy)]
 pub enum Index {
     WordAsIs
 }
@@ -39,7 +39,7 @@ impl<IO> std::fmt::Show for Subbook<IO> {
     }
 }
 
-#[deriving(Show, Eq, PartialEq, Copy)]
+#[derive(Show, Eq, PartialEq, Copy)]
 pub struct Location {
     pub page: u32,
     pub offset: u16
@@ -185,9 +185,9 @@ impl Indices {
             let page_count = try!(io.read_be_u32());
             let avail = try!(io.read_u8());
             let mut flags = 0u32;
-            flags |= try!(io.read_u8()) as u32 << 16;
-            flags |= try!(io.read_u8()) as u32 << 8;
-            flags |= try!(io.read_u8()) as u32 << 0;
+            flags |= (try!(io.read_u8()) as u32) << 16;
+            flags |= (try!(io.read_u8()) as u32) << 8;
+            flags |= (try!(io.read_u8()) as u32) << 0;
 
             let space_canonicalization = if index_id == 0x72 || index_id == 0x92 {
                 Canonicalization::AsIs
@@ -264,7 +264,7 @@ impl Indices {
     }
 }
 
-#[deriving(Show, PartialEq, Eq)]
+#[derive(Show, PartialEq, Eq)]
 pub enum TextElement {
     UnicodeString(String),
     CustomCharacter(u16),
@@ -340,7 +340,7 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
             },
             _ => {
                 let other = try!(io.read_u8());
-                let codepoint = (byte as u16 << 8) | (other as u16);
+                let codepoint = ((byte as u16) << 8) | (other as u16);
 
                 if let Some(mut ch) = jis0208::decode_codepoint(codepoint) {
                     if is_narrow {
@@ -350,7 +350,7 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                     if let Some(&TextElement::UnicodeString(ref mut s)) = text.last_mut() {
                         s.push(ch);
                     } else {
-                        text.push(TextElement::UnicodeString(String::from_char(1, ch)));
+                        text.push(TextElement::UnicodeString(format!("{}", ch)));
                     }
                 } else {
                     text.push(TextElement::CustomCharacter(codepoint));
