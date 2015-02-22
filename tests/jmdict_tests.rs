@@ -1,3 +1,5 @@
+#![feature(old_path)]
+
 extern crate epwing;
 
 use std::borrow::ToOwned;
@@ -14,7 +16,7 @@ fn catalog_test() {
     let book = open_book();
 
     assert_eq!(book.subbooks().len(), 1);
-    assert_eq!(book.subbooks()[0].title[], "ＪＭＤＩＣＴ");
+    assert_eq!(book.subbooks()[0].title, "ＪＭＤＩＣＴ");
 }
 
 #[test]
@@ -27,12 +29,12 @@ fn title_test() {
 
     let text = sbook.read_text(epwing::subbook::Location::page(spine.index_page as u32)).unwrap();
 
-    assert_eq!(text[],
+    assert_eq!(text,
               [Indent(1), Unsupported("ref"), UnicodeString("→ About this conversion".to_owned()),
               Unsupported("/ref"), Newline, Unsupported("ref"),
               UnicodeString("→ General dictionary license statement".to_owned()),
               Unsupported("/ref"), Newline, Unsupported("ref"), UnicodeString("→ JMDict information".to_owned()),
-              Unsupported("/ref"), Newline][]);
+              Unsupported("/ref"), Newline]);
 
 }
 
@@ -44,7 +46,7 @@ fn plaintext_test() {
 
     let text = sbook.read_text(epwing::subbook::Location::page(spine.index_page as u32)).unwrap();
 
-    assert_eq!(text.to_plaintext()[], " <ref>→ About this conversion</ref>
+    assert_eq!(text.to_plaintext(), " <ref>→ About this conversion</ref>
 <ref>→ General dictionary license statement</ref>
 <ref>→ JMDict information</ref>\n");
 }
