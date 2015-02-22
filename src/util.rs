@@ -1,18 +1,18 @@
-use std::io::{IoResult, Reader};
+use std::old_io::{IoResult, Reader};
 
 use jis0208;
 use unicode_hfwidth;
 
 pub trait ReaderJisExt {
-    fn read_jis_string(&mut self, len: uint) -> IoResult<Vec<u8>>;
-    fn convert_jis_string(&mut self, len: uint) -> IoResult<Option<String>>;
+    fn read_jis_string(&mut self, len: u64) -> IoResult<Vec<u8>>;
+    fn convert_jis_string(&mut self, len: u64) -> IoResult<Option<String>>;
 }
 
 impl<T: Reader> ReaderJisExt for T {
-    fn read_jis_string(&mut self, len: uint) -> IoResult<Vec<u8>> {
+    fn read_jis_string(&mut self, len: u64) -> IoResult<Vec<u8>> {
         assert_eq!(len % 2, 0);
 
-        let mut data = Vec::with_capacity(len);
+        let mut data = Vec::with_capacity(len as usize);
 
         for _ in range(0, len / 2) {
             let cp = try!(self.read_le_u16());
@@ -27,10 +27,10 @@ impl<T: Reader> ReaderJisExt for T {
         Ok(data)
     }
 
-    fn convert_jis_string(&mut self, len: uint) -> IoResult<Option<String>> {
+    fn convert_jis_string(&mut self, len: u64) -> IoResult<Option<String>> {
         assert_eq!(len % 2, 0);
 
-        let mut string = String::with_capacity(len / 2);
+        let mut string = String::with_capacity(len as usize / 2);
         let mut done = false;
         let mut err = false;
 
@@ -80,7 +80,7 @@ impl CharWidthExt for char {
     }
 }
 
-pub trait ToJisString for Sized? {
+pub trait ToJisString {
     fn to_jis_string(&self) -> Vec<u8>;
 }
 
@@ -97,7 +97,7 @@ impl ToJisString for str {
     }
 }
 
-pub trait ToUnicodeString for Sized? {
+pub trait ToUnicodeString {
     fn to_unicode_string(&self) -> String;
 }
 
@@ -119,8 +119,8 @@ fn test_conversion_roundtrip() {
     let a = "ｅｎｖｉｒｏｎｍｅｎｔａｌ　ｓｔｒｅｓｓ";
 
     let b = a.to_jis_string();
-    assert_eq!(b[], b"#e#n#v#i#r#o#n#m#e#n#t#a#l!!#s#t#r#e#s#s");
+    assert_eq!(b, b"#e#n#v#i#r#o#n#m#e#n#t#a#l!!#s#t#r#e#s#s");
 
     let c = b.to_unicode_string();
-    assert_eq!(c[], a);
+    assert_eq!(c, a);
 }

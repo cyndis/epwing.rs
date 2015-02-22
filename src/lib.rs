@@ -1,10 +1,10 @@
-#![feature(slicing_syntax, macro_rules, globs)]
+#![feature(core, unicode, old_io, old_path)]
 
 extern crate jis0208;
 extern crate unicode_hfwidth;
 
 use std::error::FromError;
-use std::io::IoError;
+use std::old_io::IoError;
 
 use catalog::Catalog;
 use subbook::Subbook;
@@ -17,12 +17,19 @@ pub mod subbook;
 mod util;
 mod canon;
 
-#[derive(Show)]
 pub enum Error {
     Io(IoError),
     InvalidEncoding,
     InvalidFormat,
     IndexNotAvailable
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        use std::error::Error;
+
+        write!(fmt, "EPWING error: {}", self.description())
+    }
 }
 
 impl std::error::Error for Error {
@@ -58,7 +65,7 @@ pub struct Book {
 
 impl Book {
     pub fn open(path: Path) -> Result<Book> {
-        let mut catalog_fp = try!(std::io::File::open(&path.join("CATALOGS")));
+        let mut catalog_fp = try!(std::old_io::File::open(&path.join("CATALOGS")));
         let catalog = try!(Catalog::from_stream(&mut catalog_fp));
 
         Ok(Book {
@@ -71,13 +78,13 @@ impl Book {
         self.catalog.subbooks.as_slice()
     }
 
-    pub fn open_subbook(&self, subbook: &catalog::Subbook) -> Result<Subbook<std::io::File>> {
+    pub fn open_subbook(&self, subbook: &catalog::Subbook) -> Result<Subbook<std::old_io::File>> {
         let last_nonws_i = try!(subbook.directory.iter().rposition(|&ch| ch != ' ' as u8)
                                                         .ok_or(Error::InvalidFormat));
-        let dir_path = subbook.directory.slice_to(last_nonws_i+1);
+        let dir_path = &subbook.directory[..last_nonws_i+1];
 
         let path = self.path.join_many(&[dir_path, b"DATA", subbook.text_file.as_slice()]);
-        let fp = try!(std::io::File::open(&path));
+        let fp = try!(std::old_io::File::open(&path));
 
         subbook::Subbook::from_io(fp)
     }

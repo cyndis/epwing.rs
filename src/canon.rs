@@ -1,7 +1,7 @@
 use util::CharWidthExt;
 use std::iter::FromIterator;
 
-#[derive(Show, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy)]
 pub enum Canonicalization {
     Convert,
     AsIs,
@@ -18,7 +18,7 @@ impl Canonicalization {
     }
 }
 
-#[derive(Show, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy)]
 pub struct CanonicalizationRules {
     pub katakana: Canonicalization,
     pub lower: Canonicalization,
@@ -32,7 +32,7 @@ pub struct CanonicalizationRules {
     pub space: Canonicalization
 }
 
-pub trait CanonicalizeExt for Sized? {
+pub trait CanonicalizeExt {
     fn canonicalize(&self, rules: &CanonicalizationRules) -> String;
 }
 
@@ -71,5 +71,5 @@ fn test_canonicalize() {
         space: Canonicalization::Delete
     };
 
-    assert_eq!("environmental stress".canonicalize(&c)[], "ＥＮＶＩＲＯＮＭＥＮＴＡＬＳＴＲＥＳＳ")
+    assert_eq!("environmental stress".canonicalize(&c), "ＥＮＶＩＲＯＮＭＥＮＴＡＬＳＴＲＥＳＳ")
 }

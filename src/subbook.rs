@@ -1,5 +1,5 @@
 use std;
-use std::io::{Reader, Seek, SeekSet};
+use std::old_io::{Reader, Seek, SeekSet};
 
 use jis0208;
 
@@ -9,21 +9,21 @@ use canon::{CanonicalizationRules, Canonicalization, CanonicalizeExt};
 use Error;
 use Result;
 
-#[derive(Show, Copy)]
+#[derive(Debug, Copy)]
 struct IndexData {
     page: u32,
     length: u32,
     canonicalization: CanonicalizationRules
 }
 
-#[derive(Show, Copy)]
+#[derive(Debug, Copy)]
 struct Indices {
     menu: Option<IndexData>,
     copyright: Option<IndexData>,
     word_asis: Option<IndexData>,
 }
 
-#[derive(Show, PartialEq, Eq, Copy)]
+#[derive(Debug, PartialEq, Eq, Copy)]
 pub enum Index {
     WordAsIs
 }
@@ -33,13 +33,13 @@ pub struct Subbook<IO> {
     indices: Indices
 }
 
-impl<IO> std::fmt::Show for Subbook<IO> {
+impl<IO> std::fmt::Debug for Subbook<IO> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Subbook {{ io: ..., indices: {} }}", self.indices)
+        write!(f, "Subbook {{ io: ..., indices: {:?} }}", self.indices)
     }
 }
 
-#[derive(Show, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy)]
 pub struct Location {
     pub page: u32,
     pub offset: u16
@@ -82,7 +82,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
     -> Result<Vec<Location>>
 {
     let page_id = try!(io.read_u8());
-    let entry_len = try!(io.read_u8()) as uint;
+    let entry_len = try!(io.read_u8()) as u64;
     let entry_count = try!(io.read_be_u16());
 
     let is_leaf = page_id & 0x80 > 0;
@@ -103,11 +103,11 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                     match group_id {
                         0x80 => {
                             /* Start of group */
-                            let name_len = try!(io.read_u8()) as uint;
+                            let name_len = try!(io.read_u8()) as u64;
                             try!(io.read_be_u32());
                             let name = try!(io.read_jis_string(name_len));
 
-                            if word == name[] {
+                            if word == name {
                                 matched = true;
                             } else {
                                 matched = false;
@@ -130,14 +130,14 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                     }
                 },
                 (false, true) => {
-                    let name_len = try!(io.read_u8()) as uint;
+                    let name_len = try!(io.read_u8()) as u64;
                     let name = try!(io.read_jis_string(name_len));
                     let text_page = try!(io.read_be_u32())-1;
                     let text_offs = try!(io.read_be_u16());
                     let _head_page = try!(io.read_be_u32());
                     let _head_offs = try!(io.read_be_u16());
 
-                    if word == name[] {
+                    if word == name {
                         results.push(Location { page: text_page, offset: text_offs });
                     }
                 },
@@ -153,7 +153,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
             let name = try!(io.read_jis_string(entry_len));
             let page = try!(io.read_be_u32()) - 1;
 
-            if word <= name[] {
+            if word <= &name {
                 try!(io.seek( (page * 0x800 ) as i64, SeekSet ));
                 return search_descend(io, word);
             }
@@ -264,7 +264,7 @@ impl Indices {
     }
 }
 
-#[derive(Show, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TextElement {
     UnicodeString(String),
     CustomCharacter(u16),
@@ -347,11 +347,13 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                         ch = ch.to_standard_width();
                     }
 
-                    if let Some(&TextElement::UnicodeString(ref mut s)) = text.last_mut() {
+                    // Cannot mutate text in else case anymore. Issue rust#22323?
+                    if let Some(&mut TextElement::UnicodeString(ref mut s)) = text.last_mut() {
                         s.push(ch);
-                    } else {
-                        text.push(TextElement::UnicodeString(format!("{}", ch)));
+                        continue;
                     }
+
+                    text.push(TextElement::UnicodeString(format!("{}", ch)));
                 } else {
                     text.push(TextElement::CustomCharacter(codepoint));
                 }
@@ -383,7 +385,7 @@ impl ToPlaintext for Text {
                 TextElement::NoNewline(_mode) => (),
                 TextElement::BeginDecoration(_deco) => (),
                 TextElement::EndDecoration => (),
-                TextElement::Unsupported(name) => out.push_str(format!("<{}>", name)[])
+                TextElement::Unsupported(name) => out.push_str(&format!("<{}>", name))
             }
         }
 

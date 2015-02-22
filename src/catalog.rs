@@ -1,15 +1,15 @@
-use std::io::Reader;
+use std::old_io::Reader;
 use jis0208;
 use Error;
 use Result;
 
-#[derive(Show)]
+#[derive(Debug)]
 pub struct Catalog {
     pub epwing_version: u16,
     pub subbooks: Vec<Subbook>,
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 pub struct Subbook {
     pub title: String,
     pub directory: Vec<u8>,
@@ -24,7 +24,7 @@ impl Catalog {
 
         try!(io.read_exact(12));
 
-        let mut subbooks = Vec::with_capacity(n_subbooks as uint);
+        let mut subbooks = Vec::with_capacity(n_subbooks as usize);
         for _ in range(0, n_subbooks) {
             subbooks.push(try!(Subbook::from_stream(io)));
         }
@@ -36,7 +36,7 @@ impl Catalog {
 fn trim_zero_cp<'a>(slice: &'a [u8]) -> &'a [u8] {
     let end = slice.chunks(2).position(|cp| cp[0] == 0 && cp[1] == 0);
     match end {
-        Some(n) => slice.slice_to(2*n),
+        Some(n) => &slice[..2*n],
         None    => slice
     }
 }
