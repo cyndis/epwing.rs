@@ -1,10 +1,11 @@
-#![feature(core, unicode, old_io, old_path)]
+#![feature(core, unicode, fs, io, old_path)]
 
 extern crate jis0208;
 extern crate unicode_hfwidth;
+extern crate byteorder;
 
 use std::error::FromError;
-use std::old_io::IoError;
+use std::io::Error as IoError;
 
 use catalog::Catalog;
 use subbook::Subbook;
@@ -57,6 +58,15 @@ impl FromError<IoError> for Error {
     }
 }
 
+impl FromError<byteorder::Error> for Error {
+    fn from_error(err: byteorder::Error) -> Error {
+        match err {
+            byteorder::Error::UnexpectedEOF => Error::InvalidFormat,
+            byteorder::Error::Io(e) => Error::Io(e)
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Book {
@@ -66,7 +76,7 @@ pub struct Book {
 
 impl Book {
     pub fn open(path: Path) -> Result<Book> {
-        let mut catalog_fp = try!(std::old_io::File::open(&path.join("CATALOGS")));
+        let mut catalog_fp = try!(std::fs::File::open(&path.join("CATALOGS")));
         let catalog = try!(Catalog::from_stream(&mut catalog_fp));
 
         Ok(Book {
@@ -79,13 +89,13 @@ impl Book {
         self.catalog.subbooks.as_slice()
     }
 
-    pub fn open_subbook(&self, subbook: &catalog::Subbook) -> Result<Subbook<std::old_io::File>> {
+    pub fn open_subbook(&self, subbook: &catalog::Subbook) -> Result<Subbook> {
         let last_nonws_i = try!(subbook.directory.iter().rposition(|&ch| ch != ' ' as u8)
                                                         .ok_or(Error::InvalidFormat));
         let dir_path = &subbook.directory[..last_nonws_i+1];
 
         let path = self.path.join_many(&[dir_path, b"DATA", subbook.text_file.as_slice()]);
-        let fp = try!(std::old_io::File::open(&path));
+        let fp = try!(std::fs::File::open(&path));
 
         subbook::Subbook::from_io(fp)
     }

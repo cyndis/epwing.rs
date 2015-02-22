@@ -1,4 +1,7 @@
-use std::old_io::Reader;
+use std::io::{Read, Seek, SeekFrom};
+use byteorder::{ReadBytesExt, BigEndian};
+use util::ReadExact;
+
 use jis0208;
 use Error;
 use Result;
@@ -18,9 +21,9 @@ pub struct Subbook {
 }
 
 impl Catalog {
-    pub fn from_stream<R: Reader>(io: &mut R) -> Result<Catalog> {
-        let n_subbooks = try!(io.read_be_u16());
-        let epwing_version = try!(io.read_be_u16());
+    pub fn from_stream<R: Read+Seek>(io: &mut R) -> Result<Catalog> {
+        let n_subbooks = try!(io.read_u16::<BigEndian>());
+        let epwing_version = try!(io.read_u16::<BigEndian>());
 
         try!(io.read_exact(12));
 
@@ -42,8 +45,8 @@ fn trim_zero_cp<'a>(slice: &'a [u8]) -> &'a [u8] {
 }
 
 impl Subbook {
-    fn from_stream<R: Reader>(io: &mut R) -> Result<Subbook> {
-        try!(io.read_exact(2));
+    fn from_stream<R: Read+Seek>(io: &mut R) -> Result<Subbook> {
+        try!(io.seek(SeekFrom::Current(2)));
 
         let title_jp = try!(io.read_exact(80));
         let trimmed = trim_zero_cp(title_jp.as_slice());
@@ -55,9 +58,9 @@ impl Subbook {
         }
         let directory = try!(io.read_exact(8));
 
-        try!(io.read_exact(4));
+        try!(io.seek(SeekFrom::Current(4)));
 
-        let index_page = try!(io.read_be_u16());
+        let index_page = try!(io.read_u16::<BigEndian>());
 
         Ok(Subbook {
             title: title,

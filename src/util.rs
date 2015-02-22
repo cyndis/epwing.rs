@@ -1,21 +1,45 @@
-use std::old_io::{IoResult, Reader};
-
 use jis0208;
 use unicode_hfwidth;
+use byteorder;
 
-pub trait ReaderJisExt {
-    fn read_jis_string(&mut self, len: u64) -> IoResult<Vec<u8>>;
-    fn convert_jis_string(&mut self, len: u64) -> IoResult<Option<String>>;
+use std::io::Read;
+use byteorder::{ReadBytesExt, LittleEndian};
+
+type BoResult<T> = Result<T, byteorder::Error>;
+
+pub trait ReadExact {
+    fn read_exact(&mut self, len: u64) -> BoResult<Vec<u8>>;
 }
 
-impl<T: Reader> ReaderJisExt for T {
-    fn read_jis_string(&mut self, len: u64) -> IoResult<Vec<u8>> {
+impl<T: Read> ReadExact for T {
+    fn read_exact(&mut self, len: u64) -> BoResult<Vec<u8>> {
+        let len = len as usize;
+
+        let mut buf = vec![0; len];
+        let mut read = 0;
+
+        while read < len {
+            let bytes = try!(self.read(&mut buf[read..]));
+            read += bytes;
+        }
+
+        Ok(buf)
+    }
+}
+
+pub trait ReaderJisExt {
+    fn read_jis_string(&mut self, len: u64) -> BoResult<Vec<u8>>;
+    fn convert_jis_string(&mut self, len: u64) -> BoResult<Option<String>>;
+}
+
+impl<T: Read> ReaderJisExt for T {
+    fn read_jis_string(&mut self, len: u64) -> BoResult<Vec<u8>> {
         assert_eq!(len % 2, 0);
 
         let mut data = Vec::with_capacity(len as usize);
 
         for _ in range(0, len / 2) {
-            let cp = try!(self.read_le_u16());
+            let cp = try!(self.read_u16::<LittleEndian>());
             if cp == 0x00 {
                 continue;
             }
@@ -27,7 +51,7 @@ impl<T: Reader> ReaderJisExt for T {
         Ok(data)
     }
 
-    fn convert_jis_string(&mut self, len: u64) -> IoResult<Option<String>> {
+    fn convert_jis_string(&mut self, len: u64) -> BoResult<Option<String>> {
         assert_eq!(len % 2, 0);
 
         let mut string = String::with_capacity(len as usize / 2);
@@ -35,7 +59,7 @@ impl<T: Reader> ReaderJisExt for T {
         let mut err = false;
 
         for _ in range(0, len / 2) {
-            let cp = try!(self.read_le_u16());
+            let cp = try!(self.read_u16::<LittleEndian>());
             if done { continue }
 
             if cp == 0x00 {

@@ -1,5 +1,8 @@
 use std;
-use std::old_io::{Reader, Seek, SeekSet};
+use std::io::{Read, Seek};
+use std::io::SeekFrom;
+use std::io::SeekFrom::Start as SeekStart;
+use byteorder::{ReadBytesExt, BigEndian};
 
 use jis0208;
 
@@ -28,12 +31,15 @@ pub enum Index {
     WordAsIs
 }
 
-pub struct Subbook<IO> {
-    io: IO,
+trait ReadSeek : Read + Seek { }
+impl<T: Read + Seek> ReadSeek for T { }
+
+pub struct Subbook {
+    io: Box<ReadSeek>,
     indices: Indices
 }
 
-impl<IO> std::fmt::Debug for Subbook<IO> {
+impl std::fmt::Debug for Subbook {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Subbook {{ io: ..., indices: {:?} }}", self.indices)
     }
@@ -51,18 +57,18 @@ impl Location {
     }
 }
 
-impl<IO: Reader+Seek> Subbook<IO> {
-    pub fn from_io(mut io: IO) -> Result<Subbook<IO>> {
+impl Subbook {
+    pub fn from_io<IO: Read+Seek+'static>(mut io: IO) -> Result<Subbook> {
         let indices = try!(Indices::read_from(&mut io));
 
         Ok(Subbook {
-            io: io,
+            io: Box::new(io),
             indices: indices
         })
     }
 
     pub fn read_text(&mut self, location: Location) -> Result<Text> {
-        try!(self.io.seek( (location.page * 0x800 + location.offset as u32) as i64, SeekSet ));
+        try!(self.io.seek( SeekStart(location.page as u64 * 0x800 + location.offset as u64) ));
         read_text(&mut self.io)
     }
 
@@ -73,17 +79,18 @@ impl<IO: Reader+Seek> Subbook<IO> {
         let index_page = idata.page - 1;
         let canonical = word.canonicalize(&idata.canonicalization).to_jis_string();
 
-        try!(self.io.seek( (index_page * 0x800 ) as i64, SeekSet ));
+        try!(self.io.seek( SeekStart(index_page as u64 * 0x800 ) ));
+
         search_descend(&mut self.io, canonical.as_slice())
     }
 }
 
-fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
+fn search_descend<IO: Read+Seek>(io: &mut IO, word: &[u8])
     -> Result<Vec<Location>>
 {
     let page_id = try!(io.read_u8());
     let entry_len = try!(io.read_u8()) as u64;
-    let entry_count = try!(io.read_be_u16());
+    let entry_count = try!(io.read_u16::<BigEndian>());
 
     let is_leaf = page_id & 0x80 > 0;
     let has_groups = page_id & 0x10 > 0;
@@ -104,7 +111,7 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                         0x80 => {
                             /* Start of group */
                             let name_len = try!(io.read_u8()) as u64;
-                            try!(io.read_be_u32());
+                            try!(io.read_u32::<BigEndian>());
                             let name = try!(io.read_jis_string(name_len));
 
                             if word == name {
@@ -119,8 +126,8 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                         },
                         0xc0 => {
                             /* Group entry */
-                            let text_page = try!(io.read_be_u32())-1;
-                            let text_offs = try!(io.read_be_u16());
+                            let text_page = try!(io.read_u32::<BigEndian>())-1;
+                            let text_offs = try!(io.read_u16::<BigEndian>());
 
                             if matched {
                                 results.push(Location { page: text_page, offset: text_offs });
@@ -132,10 +139,10 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
                 (false, true) => {
                     let name_len = try!(io.read_u8()) as u64;
                     let name = try!(io.read_jis_string(name_len));
-                    let text_page = try!(io.read_be_u32())-1;
-                    let text_offs = try!(io.read_be_u16());
-                    let _head_page = try!(io.read_be_u32());
-                    let _head_offs = try!(io.read_be_u16());
+                    let text_page = try!(io.read_u32::<BigEndian>())-1;
+                    let text_offs = try!(io.read_u16::<BigEndian>());
+                    let _head_page = try!(io.read_u32::<BigEndian>());
+                    let _head_offs = try!(io.read_u16::<BigEndian>());
 
                     if word == name {
                         results.push(Location { page: text_page, offset: text_offs });
@@ -151,10 +158,10 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
 
         for _ in range(0, entry_count) {
             let name = try!(io.read_jis_string(entry_len));
-            let page = try!(io.read_be_u32()) - 1;
+            let page = try!(io.read_u32::<BigEndian>()) - 1;
 
             if word <= &name {
-                try!(io.seek( (page * 0x800 ) as i64, SeekSet ));
+                try!(io.seek( SeekStart(page as u64 * 0x800) ));
                 return search_descend(io, word);
             }
         }
@@ -164,11 +171,11 @@ fn search_descend<IO: Reader+Seek>(io: &mut IO, word: &[u8])
 }
 
 impl Indices {
-    fn read_from<R: Reader+Seek>(io: &mut R) -> Result<Indices> {
-        try!(io.seek(1, SeekSet));
+    fn read_from<R: Read+Seek>(io: &mut R) -> Result<Indices> {
+        try!(io.seek(SeekStart(1)));
         let n_indices = try!(io.read_u8());
 
-        try!(io.seek(4, SeekSet));
+        try!(io.seek(SeekStart(4)));
         let mut global_avail = try!(io.read_u8());
         if global_avail > 0x02 { global_avail = 0x00; }
 
@@ -177,12 +184,12 @@ impl Indices {
         };
 
         for i in range(0, n_indices) {
-            try!(io.seek((16 + i * 16) as i64, SeekSet));
+            try!(io.seek(SeekStart(16 + i as u64 * 16)));
 
             let index_id = try!(io.read_u8());
-            try!(io.read_exact(1));
-            let start_page = try!(io.read_be_u32());
-            let page_count = try!(io.read_be_u32());
+            try!(io.seek(SeekFrom::Current(1)));
+            let start_page = try!(io.read_u32::<BigEndian>());
+            let page_count = try!(io.read_u32::<BigEndian>());
             let avail = try!(io.read_u8());
             let mut flags = 0u32;
             flags |= (try!(io.read_u8()) as u32) << 16;
@@ -278,7 +285,7 @@ pub enum TextElement {
 
 pub type Text = Vec<TextElement>;
 
-fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
+fn read_text<R: Read>(io: &mut R) -> Result<Text> {
     let mut text = Vec::new();
 
     let mut is_narrow = false;
@@ -302,7 +309,7 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                     // End subscript
                     0x07 => text.push(TextElement::Unsupported("/sub")),
                     // Indent
-                    0x09 => text.push(TextElement::Indent(try!(io.read_be_u16()))),
+                    0x09 => text.push(TextElement::Indent(try!(io.read_u16::<BigEndian>()))),
                     // Newline
                     0x0a => text.push(TextElement::Newline),
                     // Superscript
@@ -315,7 +322,7 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                     0x11 => text.push(TextElement::NoNewline(false)),
                     // Begin keyword
                     0x41 => {
-                        let keyword = try!(io.read_be_u16());
+                        let keyword = try!(io.read_u16::<BigEndian>());
                         if delimiter_keyword == Some(keyword) {
                             // Next entry encountered, stop.
                             break;
@@ -329,10 +336,10 @@ fn read_text<R: Reader>(io: &mut R) -> Result<Text> {
                     0x61 => (),
                     // End reference
                     0x62 => {
-                        try!(io.read_be_u32()); try!(io.read_be_u16());
+                        try!(io.read_u32::<BigEndian>()); try!(io.read_u16::<BigEndian>());
                         text.push(TextElement::Unsupported("/ref"));
                     }
-                    0xe0 => text.push(TextElement::BeginDecoration(try!(io.read_be_u16()))),
+                    0xe0 => text.push(TextElement::BeginDecoration(try!(io.read_u16::<BigEndian>()))),
                     0xe1 => text.push(TextElement::EndDecoration),
 
                     x => { println!("0x{:x}", x); return Err(Error::InvalidFormat) }

@@ -7,8 +7,9 @@ authors = ["Mikko Perttunen <cyndis@kapsi.fi>"]
 [dependencies.jis0208]
 git = "git://github.com/cyndis/jis0208"
 
-[dependencies.unicode_hfwidth]
-git = "git://github.com/cyndis/unicode_hfwidth"
+[dependencies]
+unicode_hfwidth = "*"
+byteorder = "*"
 
 [[example]]
 name = "show_contents"
