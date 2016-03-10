@@ -1,7 +1,7 @@
 use util::CharWidthExt;
 use std::iter::FromIterator;
 
-#[derive(Debug, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Canonicalization {
     Convert,
     AsIs,
@@ -18,7 +18,7 @@ impl Canonicalization {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct CanonicalizationRules {
     pub katakana: Canonicalization,
     pub lower: Canonicalization,
@@ -48,7 +48,8 @@ impl CanonicalizeExt for str {
             }
 
             if rules.lower == Convert && ch.is_lowercase() {
-                ch = ch.to_uppercase();
+                // HACK
+                ch = ch.to_uppercase().next().unwrap();
             }
 
             return Some(ch);

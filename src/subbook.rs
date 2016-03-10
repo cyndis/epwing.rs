@@ -12,21 +12,21 @@ use canon::{CanonicalizationRules, Canonicalization, CanonicalizeExt};
 use Error;
 use Result;
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Copy, Clone)]
 struct IndexData {
     page: u32,
     length: u32,
     canonicalization: CanonicalizationRules
 }
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Copy, Clone)]
 struct Indices {
     menu: Option<IndexData>,
     copyright: Option<IndexData>,
     word_asis: Option<IndexData>,
 }
 
-#[derive(Debug, PartialEq, Eq, Copy)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Index {
     WordAsIs
 }
@@ -45,7 +45,7 @@ impl std::fmt::Debug for Subbook {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Location {
     pub page: u32,
     pub offset: u16
@@ -102,7 +102,7 @@ fn search_descend<IO: Read+Seek>(io: &mut IO, word: &[u8])
         let mut results = vec![];
         let mut matched = false;
 
-        for _ in range(0, entry_count) {
+        for _ in 0..entry_count {
             match (has_groups, has_variable_arrangement) {
                 (true, _) => {
                     let group_id = try!(io.read_u8());
@@ -114,7 +114,7 @@ fn search_descend<IO: Read+Seek>(io: &mut IO, word: &[u8])
                             try!(io.read_u32::<BigEndian>());
                             let name = try!(io.read_jis_string(name_len));
 
-                            if word == name {
+                            if name == word {
                                 matched = true;
                             } else {
                                 matched = false;
@@ -144,7 +144,7 @@ fn search_descend<IO: Read+Seek>(io: &mut IO, word: &[u8])
                     let _head_page = try!(io.read_u32::<BigEndian>());
                     let _head_offs = try!(io.read_u16::<BigEndian>());
 
-                    if word == name {
+                    if name == word {
                         results.push(Location { page: text_page, offset: text_offs });
                     }
                 },
@@ -156,7 +156,7 @@ fn search_descend<IO: Read+Seek>(io: &mut IO, word: &[u8])
     } else {
         /* Internal node in index tree */
 
-        for _ in range(0, entry_count) {
+        for _ in 0..entry_count {
             let name = try!(io.read_jis_string(entry_len));
             let page = try!(io.read_u32::<BigEndian>()) - 1;
 
@@ -183,7 +183,7 @@ impl Indices {
             menu: None, copyright: None, word_asis: None
         };
 
-        for i in range(0, n_indices) {
+        for i in 0..n_indices {
             try!(io.seek(SeekStart(16 + i as u64 * 16)));
 
             let index_id = try!(io.read_u8());
@@ -381,11 +381,11 @@ impl ToPlaintext for Text {
 
         for elem in self.iter() {
             match *elem {
-                TextElement::UnicodeString(ref s) => out.push_str(s.as_slice()),
+                TextElement::UnicodeString(ref s) => out.push_str(&s),
                 TextElement::CustomCharacter(_) => (),
                 TextElement::Newline => out.push('\n'),
                 TextElement::Indent(num) => {
-                    for _ in range(0, num) {
+                    for _ in 0..num {
                         out.push(' ');
                     }
                 },

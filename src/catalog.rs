@@ -25,10 +25,10 @@ impl Catalog {
         let n_subbooks = try!(io.read_u16::<BigEndian>());
         let epwing_version = try!(io.read_u16::<BigEndian>());
 
-        try!(io.read_exact(12));
+        try!(io.read_exact_(12));
 
         let mut subbooks = Vec::with_capacity(n_subbooks as usize);
-        for _ in range(0, n_subbooks) {
+        for _ in 0..n_subbooks {
             subbooks.push(try!(Subbook::from_stream(io)));
         }
 
@@ -48,7 +48,7 @@ impl Subbook {
     fn from_stream<R: Read+Seek>(io: &mut R) -> Result<Subbook> {
         try!(io.seek(SeekFrom::Current(2)));
 
-        let title_jp = try!(io.read_exact(80));
+        let title_jp = try!(io.read_exact_(80));
         let trimmed = trim_zero_cp(title_jp.as_slice());
         let mut title = String::new();
         for cs in trimmed.chunks(2) {
@@ -56,7 +56,7 @@ impl Subbook {
             let cp = try!(jis0208::decode_codepoint((a << 8) | b).ok_or(Error::InvalidEncoding));
             title.push(cp);
         }
-        let directory = try!(io.read_exact(8));
+        let directory = try!(io.read_exact_(8));
 
         try!(io.seek(SeekFrom::Current(4)));
 

@@ -4,8 +4,8 @@ use epwing::ToPlaintext;
 use epwing::subbook::Location;
 
 pub fn main() {
-    let book_path = match std::os::args().get(1) {
-        Some(path) => Path::new(path),
+    let book_path = match std::env::args_os().nth(1) {
+        Some(path) => path.into(),
         None => panic!("No path given")
     };
 

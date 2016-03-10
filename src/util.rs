@@ -5,14 +5,14 @@ use byteorder;
 use std::io::Read;
 use byteorder::{ReadBytesExt, LittleEndian};
 
-type BoResult<T> = Result<T, byteorder::Error>;
+pub type BoResult<T> = Result<T, byteorder::Error>;
 
 pub trait ReadExact {
-    fn read_exact(&mut self, len: u64) -> BoResult<Vec<u8>>;
+    fn read_exact_(&mut self, len: u64) -> BoResult<Vec<u8>>;
 }
 
 impl<T: Read> ReadExact for T {
-    fn read_exact(&mut self, len: u64) -> BoResult<Vec<u8>> {
+    fn read_exact_(&mut self, len: u64) -> BoResult<Vec<u8>> {
         let len = len as usize;
 
         let mut buf = vec![0; len];
@@ -38,7 +38,7 @@ impl<T: Read> ReaderJisExt for T {
 
         let mut data = Vec::with_capacity(len as usize);
 
-        for _ in range(0, len / 2) {
+        for _ in 0..(len / 2) {
             let cp = try!(self.read_u16::<LittleEndian>());
             if cp == 0x00 {
                 continue;
@@ -58,7 +58,7 @@ impl<T: Read> ReaderJisExt for T {
         let mut done = false;
         let mut err = false;
 
-        for _ in range(0, len / 2) {
+        for _ in 0..(len / 2) {
             let cp = try!(self.read_u16::<LittleEndian>());
             if done { continue }
 

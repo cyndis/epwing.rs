@@ -1,10 +1,7 @@
-#![feature(core, unicode, fs, io, old_path)]
-
 extern crate jis0208;
 extern crate unicode_hfwidth;
 extern crate byteorder;
 
-use std::error::FromError;
 use std::io::Error as IoError;
 
 use catalog::Catalog;
@@ -52,14 +49,14 @@ impl std::error::Error for Error {
     }
 }
 
-impl FromError<IoError> for Error {
-    fn from_error(err: IoError) -> Error {
+impl From<IoError> for Error {
+    fn from(err: IoError) -> Error {
         Error::Io(err)
     }
 }
 
-impl FromError<byteorder::Error> for Error {
-    fn from_error(err: byteorder::Error) -> Error {
+impl From<byteorder::Error> for Error {
+    fn from(err: byteorder::Error) -> Error {
         match err {
             byteorder::Error::UnexpectedEOF => Error::InvalidFormat,
             byteorder::Error::Io(e) => Error::Io(e)
@@ -70,12 +67,12 @@ impl FromError<byteorder::Error> for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Book {
-    path: Path,
+    path: std::path::PathBuf,
     catalog: Catalog
 }
 
 impl Book {
-    pub fn open(path: Path) -> Result<Book> {
+    pub fn open(path: std::path::PathBuf) -> Result<Book> {
         let mut catalog_fp = try!(std::fs::File::open(&path.join("CATALOGS")));
         let catalog = try!(Catalog::from_stream(&mut catalog_fp));
 
@@ -90,11 +87,15 @@ impl Book {
     }
 
     pub fn open_subbook(&self, subbook: &catalog::Subbook) -> Result<Subbook> {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
         let last_nonws_i = try!(subbook.directory.iter().rposition(|&ch| ch != ' ' as u8)
                                                         .ok_or(Error::InvalidFormat));
         let dir_path = &subbook.directory[..last_nonws_i+1];
 
-        let path = self.path.join_many(&[dir_path, b"DATA", subbook.text_file.as_slice()]);
+        let path = self.path.join(OsStr::from_bytes(dir_path)).join("DATA")
+                            .join(OsStr::from_bytes(&subbook.text_file));
         let fp = try!(std::fs::File::open(&path));
 
         subbook::Subbook::from_io(fp)
